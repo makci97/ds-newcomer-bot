@@ -9,4 +9,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: ssh
-        run: root@165.232.74.131 | {{ secret.SSH_PASS }}
+        run: root@165.232.74.131 | ${{ secret.SSH_PASS }}
