@@ -8,5 +8,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: ssh
-        run: root@165.232.74.131 | ${{ secrets.SSH_PASS }}
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Execute remote SSH commands using password
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 165.232.74.131
+          username: root
+          password: ${{ secrets.SSH_PASS }}
+          port: 22
