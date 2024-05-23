@@ -29,6 +29,11 @@ jobs:
           push: true
           tags: ntrubkin/ds-newcomer-bot:latest
 
+      - name: Create .env file
+        run: |
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+
       - name: Send Docker Compose file
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -36,7 +41,7 @@ jobs:
           username: root
           password: ${{ secrets.SSH_PASS }}
           port: 22
-          source: "compose.yml"
+          source: "compose.yml,.env"
           target: /opt/ds-newcomer-bot
 
       - name: Deploy app
@@ -48,8 +53,6 @@ jobs:
           port: 22
           script: |
             cd /opt/ds-newcomer-bot
-            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
-            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
             docker compose pull
             docker compose down
             docker compose up -d
