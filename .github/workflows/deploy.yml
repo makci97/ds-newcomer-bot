@@ -23,21 +23,22 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Add environment variables
-        run: |
-          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
-
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           push: true
           tags: ntrubkin/ds-newcomer-bot:latest
 
-      - name: Execute remote SSH commands using password
+      - name: Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 165.232.74.131
           username: root
           password: ${{ secrets.SSH_PASS }}
           port: 22
+          script: |
+            image_name=ntrubkin/ds-newcomer-bot
+            docker stop $(docker ps -a --filter "ancestor=$image_name" --format "{{.ID}}")
+            docker rm $(docker ps -a --filter "ancestor=$image_name" --format "{{.ID}}")
+            docker run -e TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }} -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} $image_name:latest  
+

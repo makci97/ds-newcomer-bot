@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY config/ ./config/
 COPY handlers/ ./handlers/
 COPY utils/ ./utils/
+COPY exceptions/ ./exceptions/
 COPY app.py .
 
 # команда запуска приложения
