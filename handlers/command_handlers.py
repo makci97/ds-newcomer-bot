@@ -1,7 +1,8 @@
 import json
 
-from telegram import Update,KeyboardButton, ReplyKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
+
 
 async def start_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # объект обновления

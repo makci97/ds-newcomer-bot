@@ -1,5 +1,7 @@
 from telegram import Update
-from config.openai_client import client 
+
+from config.openai_client import client
+
 
 async def chatgpt_reply(update: Update, context):
     # текст входящего сообщения
@@ -17,7 +19,7 @@ async def chatgpt_reply(update: Update, context):
     reply = response.choices[0].message.content.strip()
 
     # перенаправление ответа в Telegram
-    await update.message.reply_text(reply)   
-    
+    await update.message.reply_text(reply)
+
     print("user:", text)
     print("assistant:", reply)
