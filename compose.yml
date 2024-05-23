@@ -1,0 +1,4 @@
+services:
+  ds-newcomer-bot:
+    image: ntrubkin/ds-newcomer-bot:latest
+    restart: unless-stopped
