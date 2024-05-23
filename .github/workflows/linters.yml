@@ -1,9 +1,6 @@
 name: Linters
 
-on:
-  push:
-    paths:
-      - '*.py'
+on: [push]
 
 jobs:
   black:
@@ -34,7 +31,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install mypy
     - name: Analysing the code with mypy
-      run: mypy .
+      run: mypy --config-file=pyproject.toml .
   
   ruff:
     runs-on: ubuntu-latest
