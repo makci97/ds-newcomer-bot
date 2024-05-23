@@ -1,7 +1,8 @@
-from telegram.ext import MessageHandler, CommandHandler, filters
-from config.telegram_bot import application 
-from handlers.message_handlers import chatgpt_reply 
+from telegram.ext import CommandHandler, MessageHandler, filters
+
+from config.telegram_bot import application
 from handlers.command_handlers import start_reply
+from handlers.message_handlers import chatgpt_reply
 
 # Регистрация обработчика текстовых сообщений
 message_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, chatgpt_reply)
