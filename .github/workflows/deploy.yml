@@ -13,4 +13,4 @@ jobs:
       - name: Push Docker image
         run: echo push
       - name: Deploy to server
-        run: echo deploy
+        run: ping -c 4 165.232.74.131
