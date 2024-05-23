@@ -13,6 +13,10 @@ async def start_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # ответ
     reply = "*update object*\n\n" + "```json\n" + update_obj + "\n```"
 
+    if update.message is None:
+        logger.error("Message not found")
+        return
+
     # перенаправление ответа в Telegram
     await update.message.reply_text(reply, parse_mode="Markdown")
 
