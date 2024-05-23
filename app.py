@@ -7,7 +7,7 @@ from exceptions.bad_choice_error import BadChoiceError
 
 # Define states
 TASK_CHOICE, KNOWLEDGE_GAIN, INTERVIEW_PREP, PROBLEM_SOL, CODE_EXPL, CODE_WRITING, PROBLEM_HELP, EDA, MEME_EXPL = range(
-    9
+    9,
 )
 
 CALLBACK_QUERY_ARG = "update.callback_query"
@@ -59,7 +59,7 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
     if choice == "MEME_EXPL":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять мемы. Беседа завершена")
+        await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять мемы. Беседа завершена.")
         return ConversationHandler.END
     raise BadChoiceError(choice)
 
@@ -72,7 +72,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     await query.answer()
     choice = query.data
     if choice == "INTERVIEW_PREP":
-        await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена")
+        await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
         return ConversationHandler.END
     if choice == "BACK":
         return await start(update, context)
@@ -91,19 +91,19 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
     if choice == "CODE_WRITING":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(text="Скоро мы научимся писать код. Беседа завершена")
+        await update.callback_query.edit_message_text(text="Скоро мы научимся писать код. Беседа завершена.")
         return ConversationHandler.END
     if choice == "PROBLEM_HELP":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
         await update.callback_query.edit_message_text(
-            text="Скоро мы научимся помогать в решении задач. Беседа завершена"
+            text="Скоро мы научимся помогать в решении задач. Беседа завершена.",
         )
         return ConversationHandler.END
     if choice == "EDA":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(text="Скоро мы научимся EDA. Беседа завершена")
+        await update.callback_query.edit_message_text(text="Скоро мы научимся EDA. Беседа завершена.")
         return ConversationHandler.END
     if choice == "BACK":
         return await start(update, context)
@@ -114,7 +114,7 @@ async def code_explanation(update: Update, _: CallbackContext) -> int:
     """Хэндлер выбора объяснения кода."""
     if update.callback_query is None:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
-    await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять код. Беседа завершена")
+    await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять код. Беседа завершена.")
     return ConversationHandler.END
 
 
@@ -122,7 +122,7 @@ async def cancel(update: Update, _: CallbackContext) -> int:
     """Завершает беседу."""
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
-    await update.message.reply_text("Беседа завершена", reply_markup=ReplyKeyboardRemove())
+    await update.message.reply_text("Беседа завершена.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
