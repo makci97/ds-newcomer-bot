@@ -6,7 +6,9 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+select = ["ALL"]
 exclude = [".venv"]
+ignore = ["D100"]
 
 [tool.mypy]
 python_version = "3.11"

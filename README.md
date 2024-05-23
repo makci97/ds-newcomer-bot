@@ -233,3 +233,14 @@ telegram_chatbot_boilerplate/
 
 4. Открываем Telegram бота и отправляем сообщение
    > Сообщения в Telegram боте и в терминале дублируются.
+
+
+## Линтеры
+Выберете интерпретатор из .venv в VSCode.
+
+Установите в VSCode плагины:
+- ms-python.black-formatter
+- ms-python.mypy-type-checker
+- charliermarsh.ruff
+
+После этого они автоматически будут применяться к коду.
