@@ -1,0 +1,16 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "master", "feature/ci-cd" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Docker image
+        run: echo build
+      - name: Push Docker image
+        run: echo push
+      - name: Deploy to server
+        run: echo deploy
