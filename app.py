@@ -1,9 +1,8 @@
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import MessageHandler, CommandHandler, filters, ConversationHandler, ContextTypes, \
+from telegram import Update, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CommandHandler, ConversationHandler, ContextTypes, \
     CallbackQueryHandler
+
 from config.telegram_bot import application
-from handlers.message_handlers import chatgpt_reply
-from handlers.command_handlers import start_reply
 
 # Define states
 TASK_CHOICE, KNOWLEDGE_GAIN, INTERVIEW_PREP, PROBLEM_SOL, CODE_EXPL, CODE_WRITING, PROBLEM_HELP, EDA, MEME_EXPL = range(9)

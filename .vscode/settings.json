@@ -1,0 +1,20 @@
+{
+    "ruff.enable": true,
+    "ruff.showNotifications": "onError",
+    "ruff.lint.args": [
+        "--config=${workspaceFolder}/pyproject.toml"
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "never",
+            "source.fixAll": "explicit"
+        },
+        "editor.formatOnSave": true,
+        "editor.rulers": [
+            120
+        ]
+    },
+    "editor.formatOnSave": true,
+    "black-formatter.importStrategy": "fromEnvironment"
+}
