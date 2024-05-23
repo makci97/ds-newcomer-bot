@@ -16,7 +16,7 @@ PYTHON_VENV=.venv/bin/python
 setup:
 	@echo "Setup venv, install requirements and create .env"
 	$(PYTHON) -m venv .venv
-	$(PIP) install -r requirements.txt
+	$(PIP) install -r requirements.txt -r requirements_dev.txt
 	make create-env
 
 # создание файла .env

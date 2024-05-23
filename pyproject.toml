@@ -1,0 +1,21 @@
+[tool.black]
+skip-string-normalization = true
+line-length = 120
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+select = ["ALL"]
+exclude = [".venv"]
+ignore = ["D100"]
+
+[tool.mypy]
+python_version = "3.11"
+files = "."
+allow_redefinition = true
+disallow_incomplete_defs = true
+ignore_missing_imports = true
+strict_optional = true
+warn_return_any = false
+warn_unused_configs = true
