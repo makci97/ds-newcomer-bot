@@ -8,9 +8,5 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Build Docker image
-        run: echo build
-      - name: Push Docker image
-        run: echo push
-      - name: Deploy to server
-        run: ping -c 4 165.232.74.131
+      - name: ssh
+        run: root@165.232.74.131 | {{ secret.SSH_PASS }}
