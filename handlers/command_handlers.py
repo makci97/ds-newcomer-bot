@@ -1,10 +1,12 @@
 import json
 
+from loguru import logger
 from telegram import Update
 from telegram.ext import ContextTypes
 
 
-async def start_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:  # noqa: ARG001
+    """Начало взаимодействия с пользователем, если он отправляет команду в чат."""
     # объект обновления
     update_obj = json.dumps(update.to_dict(), indent=4)
 
@@ -14,4 +16,4 @@ async def start_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # перенаправление ответа в Telegram
     await update.message.reply_text(reply, parse_mode="Markdown")
 
-    print("assistant:", reply)
+    logger.debug("assistant:", reply)

@@ -1,9 +1,12 @@
+from loguru import logger
 from telegram import Update
+from telegram.ext import ContextTypes
 
 from config.openai_client import client
 
 
-async def chatgpt_reply(update: Update, context):
+async def chatgpt_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:  # noqa: ARG001
+    """Начало взаимодействия с пользователем, если он пишет в чат."""
     # текст входящего сообщения
     text = update.message.text
 
@@ -21,5 +24,5 @@ async def chatgpt_reply(update: Update, context):
     # перенаправление ответа в Telegram
     await update.message.reply_text(reply)
 
-    print("user:", text)
-    print("assistant:", reply)
+    logger.debug("user:", text)
+    logger.debug("assistant:", reply)
