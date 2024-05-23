@@ -53,6 +53,7 @@ jobs:
           port: 22
           script: |
             cd /opt/ds-newcomer-bot
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} 
             docker compose pull
             docker compose down
             docker compose up -d
