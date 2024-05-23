@@ -61,7 +61,7 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
         await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять мемы. Беседа завершена.")
         return ConversationHandler.END
-    raise BadChoiceError(choice)
+    raise BadChoiceError(choice or "")
 
 
 async def knowledge_gain(update: Update, context: CallbackContext) -> int:
@@ -76,7 +76,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
         return ConversationHandler.END
     if choice == "BACK":
         return await start(update, context)
-    raise BadChoiceError(choice)
+    raise BadChoiceError(choice or "")
 
 
 async def problem_solving(update: Update, context: CallbackContext) -> int:
@@ -107,7 +107,7 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
         return ConversationHandler.END
     if choice == "BACK":
         return await start(update, context)
-    raise BadChoiceError(choice)
+    raise BadChoiceError(choice or "")
 
 
 async def code_explanation(update: Update, _: CallbackContext) -> int:
