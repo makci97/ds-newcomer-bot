@@ -76,6 +76,13 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
         await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
         return ConversationHandler.END
     if choice == "USER_SETTINGS":
+        keyboard = [
+            [InlineKeyboardButton("INTERVIEW_HARD", callback_data="INTERVIEW_HARD")],
+            [InlineKeyboardButton("QUESTIONS_HARD", callback_data="QUESTIONS_HARD")],
+            [InlineKeyboardButton("BACK", callback_data="BACK")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text="Настройки:", reply_markup=reply_markup)
         return USER_SETTINGS
     if choice == "BACK":
         return await start(update, context)
