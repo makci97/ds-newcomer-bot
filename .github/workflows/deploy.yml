@@ -40,5 +40,6 @@ jobs:
             image_name=ntrubkin/ds-newcomer-bot
             docker stop $(docker ps -a --filter "ancestor=$image_name" --format "{{.ID}}")
             docker rm $(docker ps -a --filter "ancestor=$image_name" --format "{{.ID}}")
-            docker run -e TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }} -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} $image_name:latest  
+            docker pull $image_name:latest
+            docker run -d -e TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }} -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} $image_name:latest  
 
