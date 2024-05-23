@@ -6,8 +6,8 @@ from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 
 # Define states
-TASK_CHOICE, KNOWLEDGE_GAIN, INTERVIEW_PREP, PROBLEM_SOL, CODE_EXPL, CODE_WRITING, PROBLEM_HELP, EDA, MEME_EXPL, USER_SETTINGS, INTERVIEW_HARD, QUESTIONS_HARD = range(
-    12,
+TASK_CHOICE, KNOWLEDGE_GAIN, INTERVIEW_PREP, PROBLEM_SOL, CODE_EXPL, CODE_WRITING, PROBLEM_HELP, EDA, MEME_EXPL, USER_SETTINGS, INTERVIEW_HARD, QUESTIONS_HARD,INTERN, JUNIOR, MIDDLE, SENIOR, EASY, MEDIUM, HARD = range(
+    19,
 )
 
 CALLBACK_QUERY_ARG = "update.callback_query"
@@ -73,12 +73,12 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     await query.answer()
     choice = query.data
     if choice == "INTERVIEW_PREP":
-        await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
+        await query.edit_message_text(text=f"Уровень подготовки: {context.user_data['interview_hard']} Уровень сложности: {context.user_data['questions_hard']}")
         return ConversationHandler.END
     if choice == "USER_SETTINGS":
         keyboard = [
-            [InlineKeyboardButton("INTERVIEW_HARD", callback_data="INTERVIEW_HARD")],
-            [InlineKeyboardButton("QUESTIONS_HARD", callback_data="QUESTIONS_HARD")],
+            [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],
+            [InlineKeyboardButton("Сложность заданий", callback_data="QUESTIONS_HARD")],
             [InlineKeyboardButton("BACK", callback_data="BACK")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -136,16 +136,79 @@ async def user_settings(update, context):
     await query.answer()
     choice = query.data
     if choice == "INTERVIEW_HARD":
-        await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
-        return ConversationHandler.END
+        keyboard = [
+            [InlineKeyboardButton("Intern", callback_data="INTERN")],
+            [InlineKeyboardButton("Junior", callback_data="JUNIOR")],
+            [InlineKeyboardButton("Middle", callback_data="MIDDLE")],
+            [InlineKeyboardButton("Senior", callback_data="SENIOR")],
+            [InlineKeyboardButton("BACK", callback_data="BACK")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text="Настройки:", reply_markup=reply_markup)
+        return INTERVIEW_HARD
     if choice == "QUESTIONS_HARD":
-        await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
-        return ConversationHandler.END
+        keyboard = [
+            [InlineKeyboardButton("easy", callback_data="EASY")],
+            [InlineKeyboardButton("medium", callback_data="MEDIUM")],
+            [InlineKeyboardButton("hard", callback_data="HARD")],
+            [InlineKeyboardButton("BACK", callback_data="BACK")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text="Настройки:", reply_markup=reply_markup)
+        return QUESTIONS_HARD
     if choice == "BACK":
         return await start(update, context)
     raise BadChoiceError(choice)
-    
 
+async def interview_hard(update, context):
+    """Настройки уровня знаний."""
+    query = update.callback_query
+    if query is None:
+        raise BadArgumentError(CALLBACK_QUERY_ARG)
+    await query.answer()
+    choice = query.data
+    if choice == "INTERN":
+        context.user_data["questions_hard"] = choice
+        await query.edit_message_text(text="Выбран уровень подгтовоки.")
+        return await user_settings(update, context)
+    if choice == "JUNIOR":
+        context.user_data["questions_hard"] = choice
+        await query.edit_message_text(text="Выбран уровень подгтовоки.")
+        return await user_settings(update, context)
+    if choice == "MIDDLE":
+        context.user_data["questions_hard"] = choice
+        await query.edit_message_text(text="Выбран уровень подгтовоки.")
+        return await start(update, context)
+    if choice == "SENIOR":
+        context.user_data["questions_hard"] = choice
+        await query.edit_message_text(text="Выбран уровень подгтовоки.")
+        return await start(update, context)
+    if choice == "BACK":
+        return await start(update, context)
+    raise BadChoiceError(choice)
+
+async def questions_hard(update, context):
+    """Настройки уровня сложности вопросов."""
+    query = update.callback_query
+    if query is None:
+        raise BadArgumentError(CALLBACK_QUERY_ARG)
+    await query.answer()
+    choice = query.data
+    if choice == "EASY":
+        context.user_data["interview_hard"] = choice
+        await query.edit_message_text(text="Выбран уровень сложности.")
+        return await start(update, context)
+    if choice == "MEDIUM":
+        context.user_data["interview_hard"] = choice
+        await query.edit_message_text(text="Выбран уровень сложности.")
+        return await start(update, context)
+    if choice == "HARD":
+        context.user_data["interview_hard"] = choice
+        await query.edit_message_text(text="Выбран уровень сложности.")
+        return await start(update, context)
+    if choice == "BACK":
+        return await start(update, context)
+    raise BadChoiceError(choice)
 
 
 async def cancel(update: Update, _: CallbackContext) -> int:
@@ -164,6 +227,8 @@ conv_handler = ConversationHandler(
         KNOWLEDGE_GAIN: [CallbackQueryHandler(knowledge_gain)],
         PROBLEM_SOL: [CallbackQueryHandler(problem_solving)],
         USER_SETTINGS: [CallbackQueryHandler(user_settings)],
+        INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
+        QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )
