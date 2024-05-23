@@ -6,8 +6,8 @@ from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 
 # Define states
-TASK_CHOICE, KNOWLEDGE_GAIN, INTERVIEW_PREP, PROBLEM_SOL, CODE_EXPL, CODE_WRITING, PROBLEM_HELP, EDA, MEME_EXPL = range(
-    9,
+TASK_CHOICE, KNOWLEDGE_GAIN, INTERVIEW_PREP, PROBLEM_SOL, CODE_EXPL, CODE_WRITING, PROBLEM_HELP, EDA, MEME_EXPL, USER_SETTINGS, INTERVIEW_HARD, QUESTIONS_HARD = range(
+    12,
 )
 
 CALLBACK_QUERY_ARG = "update.callback_query"
@@ -40,6 +40,7 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
     if choice == "KNOWLEDGE_GAIN":
         keyboard = [
             [InlineKeyboardButton("Подготовка к собесу", callback_data="INTERVIEW_PREP")],
+            [InlineKeyboardButton("Настройки пользователя", callback_data="USER_SETTINGS")],
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -61,7 +62,7 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
         await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять мемы. Беседа завершена.")
         return ConversationHandler.END
-    raise BadChoiceError(choice or "")
+    raise BadChoiceError(choice)
 
 
 async def knowledge_gain(update: Update, context: CallbackContext) -> int:
@@ -74,9 +75,11 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     if choice == "INTERVIEW_PREP":
         await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
         return ConversationHandler.END
+    if choice == "USER_SETTINGS":
+        return USER_SETTINGS
     if choice == "BACK":
         return await start(update, context)
-    raise BadChoiceError(choice or "")
+    raise BadChoiceError(choice)
 
 
 async def problem_solving(update: Update, context: CallbackContext) -> int:
@@ -107,7 +110,7 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
         return ConversationHandler.END
     if choice == "BACK":
         return await start(update, context)
-    raise BadChoiceError(choice or "")
+    raise BadChoiceError(choice)
 
 
 async def code_explanation(update: Update, _: CallbackContext) -> int:
@@ -116,6 +119,26 @@ async def code_explanation(update: Update, _: CallbackContext) -> int:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять код. Беседа завершена.")
     return ConversationHandler.END
+
+
+async def user_settings(update, context):
+    """Настройки сложности вопросов."""
+    query = update.callback_query
+    if query is None:
+        raise BadArgumentError(CALLBACK_QUERY_ARG)
+    await query.answer()
+    choice = query.data
+    if choice == "INTERVIEW_HARD":
+        await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
+        return ConversationHandler.END
+    if choice == "QUESTIONS_HARD":
+        await query.edit_message_text(text="Подготовка к собесу скоро будет доступна. Беседа завершена.")
+        return ConversationHandler.END
+    if choice == "BACK":
+        return await start(update, context)
+    raise BadChoiceError(choice)
+    
+
 
 
 async def cancel(update: Update, _: CallbackContext) -> int:
@@ -133,6 +156,7 @@ conv_handler = ConversationHandler(
         TASK_CHOICE: [CallbackQueryHandler(task_choice)],
         KNOWLEDGE_GAIN: [CallbackQueryHandler(knowledge_gain)],
         PROBLEM_SOL: [CallbackQueryHandler(problem_solving)],
+        USER_SETTINGS: [CallbackQueryHandler(user_settings)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )
