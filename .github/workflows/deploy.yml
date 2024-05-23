@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [ "master", "feature/ci-cd" ]
+    branches: [ "master" ]
 
 jobs:
   deploy:
@@ -23,13 +23,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           push: true
           tags: ntrubkin/ds-newcomer-bot:latest
 
-      - name: Deploy
+      - name: Deploy app
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 165.232.74.131
