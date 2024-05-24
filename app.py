@@ -235,8 +235,8 @@ async def code_help(update: Update, context: CallbackContext) -> int:
     if choice == "BACK":
         return await start(update, context)
 
-    context.user_data["prompt_type"] = "code_help"
-    context.user_data["prompt_mode"] = choice
+    context.user_data["prompt_type"] = "code_help"  # type: ignore[index]
+    context.user_data["prompt_mode"] = choice  # type: ignore[index]
 
     await query.edit_message_text(text="Ваш код:")
     return HELP_FACTORY
@@ -252,8 +252,8 @@ async def task_help(update: Update, context: CallbackContext) -> int:
     if choice == "BACK":
         return await start(update, context)
 
-    context.user_data["prompt_type"] = "task_help"
-    context.user_data["prompt_mode"] = query.data
+    context.user_data["prompt_type"] = "task_help"  # type: ignore[index]
+    context.user_data["prompt_mode"] = query.data  # type: ignore[index]
 
     await query.edit_message_text(text="Описание вашей задачи:")
     return HELP_FACTORY
