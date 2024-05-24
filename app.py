@@ -1,9 +1,11 @@
 import base64
+import io
 from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
 from telegram import (
+    File,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
@@ -30,7 +32,11 @@ from utils.helpers import check_user_settings, single_text2text_query
 from utils.prompts import CodePrompt, Prompt, TaskPrompt
 
 if TYPE_CHECKING:
+    from openai.types.beta.assistant import Assistant
+    from openai.types.beta.thread import Thread
+    from openai.types.beta.threads import Message, Run
     from openai.types.chat.chat_completion import ChatCompletion
+    from openai.types.file_object import FileObject
 
 # Define states
 (
@@ -205,8 +211,13 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
     if choice == "EDA":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(text="Скоро мы научимся EDA. Беседа завершена.")
-        return ConversationHandler.END
+        keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text="Отправьте датасет в csv-формате, для которого хотите получить EDA:",
+            reply_markup=reply_markup,
+        )
+        return EDA
     if choice == "DIALOG":
         if context.user_data is None:
             raise BadArgumentError(USER_DATA_ARG)
@@ -284,6 +295,75 @@ async def help_factory(update: Update, context: CallbackContext) -> int:
     )
 
     await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return await start(update, context)
+
+
+async def eda(update: Update, context: CallbackContext) -> int:
+    """Хэндлер исследовательского анализа датасета."""
+    query = update.callback_query
+    if query and query.data == "CANCEL":
+        return await start(update, context)
+    if update.message is None or update.message.document is None:
+        raise BadArgumentError(MESSAGE_ARG)
+
+    logger.info("Download dataset from chat")
+    stream_dataset: io.BytesIO = io.BytesIO()
+    file: File = await context.bot.get_file(update.message.document)
+    await file.download_to_memory(stream_dataset)
+
+    logger.info("Updload dataset to OpenAI")
+    stream_dataset.seek(0)
+    dataset_file: FileObject = client.files.create(file=stream_dataset, purpose="assistants")
+
+    logger.info("Create task for model")
+    thread: Thread = client.beta.threads.create()
+    task_message: Message = client.beta.threads.messages.create(
+        thread_id=thread.id,
+        role="user",
+        content="Describe this dataset.",
+    )
+
+    logger.info("Create assistent for working with dataset")
+    eda_assistant: Assistant = client.beta.assistants.create(
+        instructions="""You are an excellent senior Data Scientist with 10 years of experience.
+        You make Exploratory Data Analysis for recieved datasets.
+        Split messages to chunck which fewer than 3000 chars.
+        Give anwser on russian except of column names or terms.
+        """,
+        model="gpt-4o",
+        tools=[{"type": "code_interpreter"}],
+        tool_resources={"code_interpreter": {"file_ids": [dataset_file.id]}},
+    )
+
+    logger.info("Process dataset")
+    await update.message.reply_text(text="Обрабатываем датасет")
+    run: Run = client.beta.threads.runs.create_and_poll(
+        thread_id=thread.id,
+        assistant_id=eda_assistant.id,
+    )
+
+    logger.info("Send answers")
+    if run.status == "completed":
+        response_messages = client.beta.threads.messages.list(
+            thread_id=thread.id,
+            order="asc",
+            after=task_message.id,
+        )
+        for data in response_messages.data:
+            if len(data.content) == 0:
+                logger.error(f"Empty {data=}")
+                continue
+
+            for one_content in data.content:
+                if hasattr(one_content, "text"):
+                    logger.debug(one_content.text.value)
+                    await update.message.reply_text(text=one_content.text.value, parse_mode=ParseMode.MARKDOWN)
+                else:
+                    logger.error(f"Message without text field {one_content=}")
+
+        return await start(update, context)
+
+    await update.message.reply_text(text="Этот датасет оказался нам не по зубам. Беседа завершена.")
     return await start(update, context)
 
 
@@ -509,6 +589,7 @@ conv_handler = ConversationHandler(
         CODE_HELP: [CallbackQueryHandler(code_help)],
         TASK_HELP: [CallbackQueryHandler(task_help)],
         HELP_FACTORY: [CallbackQueryHandler(task_help), MessageHandler(filters.TEXT, help_factory)],
+        EDA: [CallbackQueryHandler(eda), MessageHandler(filters.ATTACHMENT, eda), CommandHandler("start", start)],
         USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
         DIALOG: [
