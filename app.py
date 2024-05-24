@@ -316,7 +316,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
         return await start(update, context)
 
     await update.message.reply_text(text="Этот датасет оказался нам не по зубам. Беседа завершена.")
-    return ConversationHandler.END
+    return await start(update, context)
 
 
 async def user_settings(update: Update, context: CallbackContext) -> int:
@@ -539,7 +539,7 @@ conv_handler = ConversationHandler(
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
         CODE_EXPL: [CallbackQueryHandler(code_explanation), MessageHandler(filters.TEXT, code_explanation)],
-        EDA: [CallbackQueryHandler(eda), MessageHandler(filters.ATTACHMENT, eda)],
+        EDA: [CallbackQueryHandler(eda), MessageHandler(filters.ATTACHMENT, eda), CommandHandler("start", start)],
         USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
         DIALOG: [
