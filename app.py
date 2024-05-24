@@ -1,10 +1,25 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, Update
-from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, ConversationHandler
+import base64
+from typing import TYPE_CHECKING
 
+from loguru import logger
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram.ext import (
+    CallbackContext,
+    CallbackQueryHandler,
+    CommandHandler,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
+
+from config.openai_client import client
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.helpers import check_user_settings
+
+if TYPE_CHECKING:
+    from openai.types.chat.chat_completion import ChatCompletion
 
 # Define states
 (
@@ -85,8 +100,12 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
     if choice == "MEME_EXPL":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять мемы. Беседа завершена.")
-        return ConversationHandler.END
+        keyboard = [
+            [InlineKeyboardButton("Отмена", callback_data="CANCEL")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text="Отправьте мем одним изображением", reply_markup=reply_markup)
+        return MEME_EXPL
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
@@ -253,6 +272,55 @@ async def questions_hard(update: Update, context: CallbackContext) -> int:
     return USER_SETTINGS
 
 
+async def meme_explanation(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога объяснения IT мема."""
+    query = update.callback_query
+    if query and query.data == "CANCEL":
+        return await start(update, context)
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    file = await update.message.photo[-1].get_file()
+    data = await file.download_as_bytearray()
+    explanation = explain_meme(data)
+    await update.message.reply_text(text=f"{explanation}")
+    return await start(update, context)
+
+
+def explain_meme(data: bytearray) -> str:
+    """Отправить мем в ChatGPT и получить его строковое описание."""
+    bytes_data = bytes(data)
+    base64_encoded = base64.b64encode(bytes_data)
+    base64_string = base64_encoded.decode("utf-8")
+    response: ChatCompletion = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        # TODO @ntrubkin: написать промт на объяснение IT мема
+                        "text": "Что на изображении?",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_string}",
+                        },
+                    },
+                ],
+            },
+        ],
+        max_tokens=1024,
+        temperature=0.5,
+    )
+    content = response.choices[0].message.content
+    if content is None:
+        logger.error("OpenAI содержит пустой ответ")
+        return ""
+    return content.strip()
+
+
 async def cancel(update: Update, _: CallbackContext) -> int:
     """Завершает беседу."""
     if update.message is None:
@@ -271,6 +339,7 @@ conv_handler = ConversationHandler(
         USER_SETTINGS: [CallbackQueryHandler(user_settings)],
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
+        MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )
