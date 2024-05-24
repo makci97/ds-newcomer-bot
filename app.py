@@ -1,4 +1,5 @@
 import base64
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -19,7 +20,7 @@ from telegram.ext import (
     filters,
 )
 
-from config.openai_client import client
+from config.openai_client import client, generate_response, generate_transcription
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
@@ -51,8 +52,9 @@ if TYPE_CHECKING:
     HARD,
     ALGO_TASK,
     ML_TASK,
+    USER_REPLY,
     DIALOG,
-) = range(22)
+) = range(23)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -129,24 +131,29 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await query.answer()
     choice = query.data
-    if choice == "INTERVIEW_PREP" and check_user_settings(context):
-        await query.edit_message_text(
-            text=f"Уровень подготовки:\
-            {context.user_data['interview_hard']} Уровень сложности: {context.user_data['questions_hard']}",  # type: ignore  # noqa: PGH003
+    if choice == "INTERVIEW_PREP" and check_user_settings(
+        context,
+    ):
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        await update.callback_query.edit_message_text(
+            text="Please send a voice message or text reply.",
         )
-        return ConversationHandler.END
+        return USER_REPLY
     if choice == "ALGO_TASK" and check_user_settings(context):
-        await query.edit_message_text(
-            text=f"Уровень подготовки:\
-                  {context.user_data['interview_hard']} Уровень сложности: {context.user_data['questions_hard']}",  # type: ignore  # noqa: PGH003
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        await update.callback_query.edit_message_text(
+            text="Please send a voice message or text reply.",
         )
-        return ConversationHandler.END
+        return USER_REPLY
     if choice == "ML_TASK" and check_user_settings(context):
-        await query.edit_message_text(
-            text=f"Уровень подготовки: \
-                {context.user_data['interview_hard']} Уровень сложности: {context.user_data['questions_hard']}",  # type: ignore  # noqa: PGH003
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        await update.callback_query.edit_message_text(
+            text="Please send a voice message or text reply.",
         )
-        return ConversationHandler.END
+        return USER_REPLY
     if choice == "USER_SETTINGS":
         keyboard = [
             [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],
@@ -400,6 +407,30 @@ async def cancel(update: Update, _: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+async def handle_user_reply(update: Update, context: CallbackContext) -> None:
+    """обработка  ответа от пользователя."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        transcription = generate_transcription(audio_bytes)
+
+        reply = generate_response(transcription)
+        await update.message.reply_text(reply)
+
+        logger.info("user:", audio_file.file_path)
+        logger.info("transcription:", transcription)
+        logger.info("assistant:", reply)
+
+    if update.message.text:
+        reply = generate_response(update.message.text)
+        await update.message.reply_text(reply)
+
+
 """Run the bot."""
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
@@ -410,6 +441,7 @@ conv_handler = ConversationHandler(
         USER_SETTINGS: [CallbackQueryHandler(user_settings)],
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
+        USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
         DIALOG: [
             MessageHandler(~filters.COMMAND, dialog),
