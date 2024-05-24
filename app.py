@@ -11,6 +11,7 @@ from telegram import (
     ReplyKeyboardRemove,
     Update,
 )
+from telegram.constants import ParseMode
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -252,7 +253,7 @@ async def code_explanation(update: Update, context: CallbackContext) -> int:
         max_tokens=MAX_TOKENS,
         temperature=TEMPERATURE,
     )
-    await update.message.reply_text(text=explanation)
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
     return await start(update, context)
 
 
