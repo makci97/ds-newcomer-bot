@@ -1,6 +1,3 @@
-
-from telegram.ext import CallbackContext
-
 """Helper functions."""
 
 import typing
