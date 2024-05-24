@@ -1,5 +1,6 @@
 """Prompt builders."""
 
+import base64
 import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -300,3 +301,82 @@ class PsychoHelpPrompt(Prompt):
                 Ответь на его вопросы и помоги ему
         """
         return [{"role": "system", "content": prompt}, *self.reply]
+
+
+@dataclass
+class MemeImagePrompt(Prompt):
+    """Prompt builder for meme explanation scenario."""
+
+    image: bytearray
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Meme scenario prompt."""
+        prompt: str = """Представь, что ты столкнулся с мемом, который вызывает у тебя смех. Важно не описать
+         картинку, а понять, почему этот мем смешной. Ответь коротко на следующие вопросы: Какие элементы мема
+         вызывают смех? Какая основная идея или шутка заложена в меме? Есть ли какие-либо культурные или
+         интернет-отсылки, которые следует знать, чтобы понять мем? Ответ не структурируй."""
+        bytes_data = bytes(self.image)
+        base64_encoded = base64.b64encode(bytes_data)
+        base64_string = base64_encoded.decode("utf-8")
+        return [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt,
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_string}",
+                        },
+                    },
+                ],
+            },
+        ]
+
+
+@dataclass
+class MemeNeedReactionPrompt(Prompt):
+    """Prompt builder for meme reaction scenario."""
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Meme reaction prompt."""
+        prompt: str = """Представьте, что вам прислали в чат мем. Вам нужно отреагировать на него в чате так, чтобы
+         показать, что вы его поняли."""
+        return [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt,
+                    },
+                ],
+            },
+        ]
+
+
+@dataclass
+class GenericUserTextPrompt(Prompt):
+    """Prompt builder for text user message."""
+
+    text: str
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """User text prompt."""
+        return [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": self.text,
+                    },
+                ],
+            },
+        ]

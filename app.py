@@ -33,7 +33,10 @@ from utils.helpers import check_user_settings, single_text2text_query
 from utils.prompts import (
     AlgoTaskMakerPrompt,
     CodePrompt,
+    GenericUserTextPrompt,
     InterviewMakerPrompt,
+    MemeImagePrompt,
+    MemeNeedReactionPrompt,
     MLTaskMakerPrompt,
     Prompt,
     PsychoHelpPrompt,
@@ -171,7 +174,8 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
             text=f"Уровень подготовки:"
             f"{context.user_data['interview_hard']}\nУровень заданий:"  # type: ignore  # noqa: PGH003
-            f"{context.user_data['questions_hard']}\nНа какую тему будет собеседование?",  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему будет собеседование?",
+            # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
         )
         return INTERVIEW_DIALOG
@@ -213,7 +217,8 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
             text=f"Уровень подготовки: "
             f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
-            f"{context.user_data['questions_hard']}\nНа какую тему хочешь вопросы?",  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь вопросы?",
+            # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return QUESTIONS_ASKER
@@ -241,7 +246,8 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
             text=f"Уровень подготовки: "
             f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
-            f"{context.user_data['questions_hard']}\nНа какую тему хочешь RoadMap?",  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь RoadMap?",
+            # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return ROADMAP_MAKER
@@ -580,10 +586,7 @@ async def meme_need_reaction(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(USER_DATA_ARG)
     if update.callback_query.data == "NEED_MEME_REACTION_YES":
         message = await update.callback_query.edit_message_text("Ок, генерирую ответ...")
-        context.user_data["dialog"].append_user_text(
-            """Представьте, что вам прислали в чат мем. Вам нужно отреагировать на него в чате так, чтобы показать,
-             что вы его поняли.""",
-        )
+        context.user_data["dialog"].messages.append(*MemeNeedReactionPrompt().messages)
         response = send_to_open_ai(context.user_data["dialog"])
         await message.edit_text(response)  # type: ignore   # noqa: PGH003
     else:
@@ -602,13 +605,7 @@ def explain_meme(image: bytearray, context: CallbackContext) -> str:
         temperature=0.5,
     )
     context.user_data["dialog"] = dialog_context
-    dialog_context.append_user_image(
-        image,
-        """Представь, что ты столкнулся с мемом, который вызывает у тебя
-     смех. Важно не описать картинку, а понять, почему этот мем смешной. Ответь коротко на следующие вопросы: Какие
-     элементы мема вызывают смех? Какая основная идея или шутка заложена в меме? Есть ли какие-либо культурные или
-     интернет-отсылки, которые следует знать, чтобы понять мем? Ответ не структурируй.""",
-    )
+    dialog_context.messages.append(*MemeImagePrompt(image=image).messages)
     return send_to_open_ai(dialog_context)
 
 
@@ -635,7 +632,6 @@ async def algo_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -674,7 +670,6 @@ async def ml_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -713,7 +708,6 @@ async def interview_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -752,7 +746,6 @@ async def quest_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -791,7 +784,6 @@ async def test_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -830,7 +822,6 @@ async def roadmap_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -869,7 +860,6 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -897,11 +887,14 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
 
 async def meme_explanation_dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога объяснения мема."""
-    if update.message is None:
+    if update.message is None or update.message.text:
+        raise BadArgumentError(MESSAGE_ARG)
+    if update.message.text:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].append_user_text(update.message.text)
+    messages = GenericUserTextPrompt(text=update.message.text).messages  # type: ignore[arg-type]
+    context.user_data["dialog"].messages.append(*messages)
     response = send_to_open_ai(context.user_data["dialog"])
 
     if context.user_data is None:
