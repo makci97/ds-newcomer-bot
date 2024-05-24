@@ -56,13 +56,13 @@ if TYPE_CHECKING:
     ALGO_TASK,
     ML_TASK,
     DIALOG,
-) = range(22)
+    ALGO_DIALOG,
+) = range(23)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
 EFFECTIVE_CHAT_ARG = "update.effective_chat"
 USER_DATA_ARG = "context.user_data"
-I = 0
 
 
 async def start(update: Update, context: CallbackContext) -> int:
@@ -134,15 +134,18 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await query.answer()
     choice = query.data
-    # if choice == "INTERVIEW_PREP" and check_user_settings(
-    #     context,
-    # ):
-    #     if update.callback_query is None:
-    #         raise BadArgumentError(CALLBACK_QUERY_ARG)
-    #     await update.callback_query.edit_message_text(
-    #         text="Please send a voice message or text reply.",
-    #     )
-    #     return DIALOG
+    if choice == "INTERVIEW_PREP" and check_user_settings(context):
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        context.user_data["dialog"] = []
+        context.user_data["topic"] = ""
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore[arg-type]
+            text=f"Уровень подготовки: {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\n",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+        )
+        return DIALOG
     if choice == "ALGO_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
@@ -154,14 +157,19 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             text=f"Уровень подготовки: {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\nНа какую тему задачу?",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
+        return ALGO_DIALOG
+    if choice == "ML_TASK" and check_user_settings(context):
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        context.user_data["dialog"] = []
+        context.user_data["topic"] = ""
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"Уровень подготовки: {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\nНа какую тему хочешь задачу?",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
+        )
         return DIALOG
-    # if choice == "ML_TASK" and check_user_settings(context):
-    #     if update.callback_query is None:
-    #         raise BadArgumentError(CALLBACK_QUERY_ARG)
-    #     await update.callback_query.edit_message_text(
-    #         text="Please send a voice message or text reply.",
-    #     )
-    #     return DIALOG
     if choice == "USER_SETTINGS":
         keyboard = [
             [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],
@@ -379,7 +387,7 @@ def explain_meme(data: bytearray) -> str:
     return content.strip()
 
 
-async def dialog(update: Update, context: CallbackContext) -> int:
+async def algo_dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога."""
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
@@ -415,6 +423,18 @@ async def dialog(update: Update, context: CallbackContext) -> int:
     )
 
     await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return DIALOG
+
+
+async def dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    context.user_data["dialog"].append(update.message.text)
+    context.user_data["dialog"].append("Какой-то ответ")
+    await update.message.reply_text(text="Какой-то ответ")
     return DIALOG
 
 
@@ -470,6 +490,11 @@ conv_handler = ConversationHandler(
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
         DIALOG: [
             MessageHandler(~filters.COMMAND, dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        ALGO_DIALOG: [
+            MessageHandler(~filters.COMMAND, algo_dialog),
             CommandHandler("start", start),
             CommandHandler("finish_dialog", finish_dialog),
         ],

@@ -13,7 +13,7 @@ class Prompt(ABC):
 
     @property
     @abstractmethod
-    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Final message history to be sent to LLM."""
         raise NotImplementedError
 
@@ -25,7 +25,7 @@ class CodeExplanationPrompt(Prompt):
     code: str
 
     @property
-    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt to retrieve code explanation."""
         prompt: str = """
             You are a virtual assistant for a data scientist.
@@ -52,13 +52,13 @@ class AlgoTaskMakerPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for algo scenario."""
         prompt: str = f"""
-                Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование 
+                Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
                 с кандидатом на позицию {self.interview_hard} DS-разработчика.
-                Сформулируй задачу на алгоритмы (описание условий, пример данных на вход и выход)  
-                и задай по ней вопросы(память и время выполнение) на тему {self.topic} уровня {self.questions_hard} 
+                Сформулируй задачу на алгоритмы (описание условий, пример данных на вход и выход)
+                и задай по ней вопросы(память и время выполнение) на тему {self.topic} уровня {self.questions_hard}
                 без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
                 Когда пользователь пришлет решение разбери его и если решение не правильное приведи правильное
         """
