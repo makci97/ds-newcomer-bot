@@ -12,6 +12,7 @@ from telegram.ext import (
     filters,
 )
 
+from config.openai_client import client
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
@@ -187,8 +188,6 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
 async def code_language(update: Update, context: CallbackContext) -> int:
     """Хэндлер выбора языка для объяснения кода."""
     query = update.callback_query
-    if query is None:
-        raise BadArgumentError(CALLBACK_QUERY_ARG)
     if query and query.data == "CANCEL":
         return await start(update, context)
     if update.message is None:
@@ -198,15 +197,13 @@ async def code_language(update: Update, context: CallbackContext) -> int:
         [InlineKeyboardButton("Отмена", callback_data="CANCEL")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text="Введите код, который нужно объяснить:", reply_markup=reply_markup)
+    await update.message.reply_text(text="Введите код, который нужно объяснить:", reply_markup=reply_markup)
     return CODE_EXPL
 
 
 async def code_explanation(update: Update, context: CallbackContext) -> int:
     """Хэндлер объяснения кода."""
     query = update.callback_query
-    if query is None:
-        raise BadArgumentError(CALLBACK_QUERY_ARG)
     if query and query.data == "CANCEL":
         return await start(update, context)
     if update.message is None or update.message.text is None:
