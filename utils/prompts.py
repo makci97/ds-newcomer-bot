@@ -15,7 +15,7 @@ class Prompt(ABC):
 
     @property
     @abstractmethod
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Final message history to be sent to LLM."""
         raise NotImplementedError
 
@@ -145,3 +145,158 @@ class TaskPrompt(Prompt):
             {"role": "system", "content": prompt},
             {"role": "user", "content": self.task},
         ]
+
+
+@dataclass
+class AlgoTaskMakerPrompt(Prompt):
+    """Prompt builder for algo task scenario."""
+
+    questions_hard: str
+    interview_hard: str
+    topic: str
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for algo scenario."""
+        prompt: str = f"""
+                Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
+                с кандидатом на позицию {self.interview_hard} DS-разработчика.
+                Сформулируй задачу на алгоритмы (описание условий, пример данных на вход и выход)
+                и задай по ней вопросы(память и время выполнение) на тему {self.topic} уровня {self.questions_hard}
+                без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
+                Когда пользователь пришлет решение разбери его и если решение не правильное приведи правильное
+        """
+        return [{"role": "system", "content": prompt}, *self.reply]
+
+
+@dataclass
+class MLTaskMakerPrompt(Prompt):
+    """Prompt builder for ml task scenario."""
+
+    questions_hard: str
+    interview_hard: str
+    topic: str
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for ml scenario."""
+        prompt: str = f"""
+                Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
+                с кандидатом на позицию {self.interview_hard} DS-разработчика.
+                Сформулируй задачу на алгоритмы (описание условий, пример данных на вход и выход)
+                и задай по ней вопросы(память и время выполнение) на тему {self.topic} уровня {self.questions_hard}
+                без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
+                Когда пользователь пришлет решение разбери его и если решение не правильное приведи правильное
+        """
+        return [{"role": "system", "content": prompt}, *self.reply]
+
+
+@dataclass
+class InterviewMakerPrompt(Prompt):
+    """Prompt builder for interview task scenario."""
+
+    questions_hard: str
+    interview_hard: str
+    topic: str
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for interview scenario."""
+        prompt: str = f"""
+                Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
+                с кандидатом на позицию {self.interview_hard} DS-разработчика. Тема разговора: {self.topic}
+                Сформулируй две задачи на алгоритмы(описание условий, пример данных на вход и выход)
+                уровня {self.questions_hard}
+                и серию вопросов по DS/ML  уровня {self.questions_hard} без подсказок и не показывай правильный
+                ответ пока пользователь не отправит свое решение
+                без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
+                Когда пользователь пришлет решение разбери его и если решение не правильное приведи правильное
+        """
+        return [{"role": "system", "content": prompt}, *self.reply]
+
+
+@dataclass
+class QestionsAskerPrompt(Prompt):
+    """Prompt builder for interview task scenario."""
+
+    questions_hard: str
+    interview_hard: str
+    topic: str
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for interview scenario."""
+        prompt: str = f"""
+                        Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей провести собеседование
+                        с  {self.interview_hard} DS-разработчиком. Вам необходимо придумать ряд вопросов на тему
+                        {self.topic} различного уровня сложности: {self.questions_hard}.
+                        Важно, чтобы вопросы были разнообразными и не требовали подсказок.
+                        Правильные ответы не следует показывать до тех пор,
+                        пока пользователь не отправит свое решение.
+        """
+        return [{"role": "system", "content": prompt}, *self.reply]
+
+
+@dataclass
+class TestMakerPrompt(Prompt):
+    """Prompt builder for interview task scenario."""
+
+    questions_hard: str
+    interview_hard: str
+    topic: str
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for interview scenario."""
+        prompt: str = f"""
+                Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей помочь {self.interview_hard}
+                DS-разработчику в подготовке к теме {self.topic} различного уровня сложности:
+                {self.questions_hard}.Вам необходимо предоставить тест с вариантами ответов,
+                который поможет им оценить свои знания и умения.
+                Важно, чтобы тест был разнообразным и не требовал подсказок.
+                Правильные ответы не следует показывать до тех пор, пока пользователь не отправит свое решение.
+        """
+        return [{"role": "system", "content": prompt}, *self.reply]
+
+
+@dataclass
+class RoadMapMakerPrompt(Prompt):
+    """Prompt builder for interview task scenario."""
+
+    questions_hard: str
+    interview_hard: str
+    topic: str
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for interview scenario."""
+        prompt: str = f"""
+                    Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей помочь
+                    {self.interview_hard} DS-разработчику в подготовке к теме {self.topic} уровня сложности:
+                    {self.questions_hard}. Вам необходимо предоставить план с пунктами, которые
+                    помогут им освоить эту тему. Важно, чтобы пункты были разнообразными и не требовали ссылок.
+        """
+        return [{"role": "system", "content": prompt}, *self.reply]
+
+
+@dataclass
+class PsychoHelpPrompt(Prompt):
+    """Prompt builder for interview task scenario."""
+
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for interview scenario."""
+        prompt: str = """
+                Представь, что ты опытный психолог, и к тебе пришел DS-разработчик.
+                И просит помочь ему подготовиться к собеседованию.
+                Ответь на его вопросы и помоги ему
+        """
+        return [{"role": "system", "content": prompt}, *self.reply]
