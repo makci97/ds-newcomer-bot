@@ -149,7 +149,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def problem_solving(update: Update, context: CallbackContext) -> int:
+async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901
     """хэндлер выбора помощи в решении задач."""
     query = update.callback_query
     if query is None:
