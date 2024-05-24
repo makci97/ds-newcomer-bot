@@ -20,6 +20,10 @@ lint.ignore = [
     "ANN101",
     "TD003",    # Missing issue link on the line following this _TODO
     "FIX002",   # Line contains _TODO, consider resolving the issue
+    "PLR0915",
+    "C901",
+    "PLR0911",
+    "PLR0912",
 ]
 
 [tool.mypy]
