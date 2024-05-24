@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 from telegram import (
+    Document,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
@@ -26,6 +27,7 @@ from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, ModelName
+from utils.dialog_context import DialogContext
 from utils.helpers import check_user_settings, single_text2text_query
 from utils.prompts import CodeExplanationPrompt
 
@@ -43,6 +45,7 @@ if TYPE_CHECKING:
     PROBLEM_HELP,
     EDA,
     MEME_EXPL,
+    MEME_EXPL_DIALOG,
     USER_SETTINGS,
     INTERVIEW_HARD,
     QUESTIONS_HARD,
@@ -57,7 +60,7 @@ if TYPE_CHECKING:
     ML_TASK,
     USER_REPLY,
     DIALOG,
-) = range(23)
+) = range(24)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -70,7 +73,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     await remove_chat_buttons(update, context)
-    context.user_data["dialog"] = []
+    context.user_data["dialog"] = None
     keyboard = [
         [InlineKeyboardButton("Прокачка знаний", callback_data="KNOWLEDGE_GAIN")],
         [InlineKeyboardButton("Помоги решить задачу", callback_data="PROBLEM_SOL")],
@@ -214,6 +217,11 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
             text="Начинаем диалог",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
+        context.user_data["dialog"] = DialogContext(
+            model=ModelName.GPT_4O,
+            max_tokens=MAX_TOKENS,
+            temperature=TEMPERATURE,
+        )
         return DIALOG
     if choice == "BACK":
         return await start(update, context)
@@ -331,46 +339,76 @@ async def meme_explanation(update: Update, context: CallbackContext) -> int:
         return await start(update, context)
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
+    file = None
+    if update.message.photo:
+        file = await update.message.photo[-1].get_file()
+    if (
+        update.message.effective_attachment
+        and type(update.message.effective_attachment) is Document
+        and update.message.effective_attachment.mime_type
+        and update.message.effective_attachment.mime_type.startswith("image/")
+    ):
+        file = await update.message.effective_attachment.get_file()
+    if file is None:
+        return MEME_EXPL
     await update.message.reply_text(text="Анализируем мем...")
-    file = await update.message.photo[-1].get_file()
     data = await file.download_as_bytearray()
-    explanation = explain_meme(data)
-    await update.message.reply_text(text=f"{explanation}")
-    return await start(update, context)
+    explanation = explain_meme(data, context)
+    keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+    await update.message.reply_text(
+        text=f"{explanation}",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+    )
+    return MEME_EXPL_DIALOG
 
 
-def explain_meme(data: bytearray) -> str:
-    """Отправить мем в ChatGPT и получить его строковое описание."""
-    bytes_data = bytes(data)
+def explain_meme(image: bytearray, context: CallbackContext) -> str:
+    """Объяснить мем по изображению."""
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    bytes_data = bytes(image)
     base64_encoded = base64.b64encode(bytes_data)
     base64_string = base64_encoded.decode("utf-8")
-    response: ChatCompletion = client.chat.completions.create(
+    dialog_context = DialogContext(
         model="gpt-4o",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        # TODO @ntrubkin: написать промт на объяснение IT мема
-                        "text": "Что на изображении?",
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_string}",
-                        },
-                    },
-                ],
-            },
-        ],
         max_tokens=1024,
         temperature=0.5,
+    )
+    context.user_data["dialog"] = dialog_context
+    dialog_context.messages.append(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    # TODO @ntrubkin: написать промт на объяснение IT мема
+                    "text": "Что на изображении?",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_string}",
+                    },
+                },
+            ],
+        }
+    )
+    return send_to_open_ai(dialog_context)
+
+
+def send_to_open_ai(dialog_context: DialogContext) -> str:
+    """Отправить контекст диалога в OpenAI."""
+    response: ChatCompletion = client.chat.completions.create(
+        model=dialog_context.model,
+        messages=dialog_context.messages,
+        max_tokens=dialog_context.max_tokens,
+        temperature=dialog_context.temperature,
     )
     content = response.choices[0].message.content
     if content is None:
         logger.error("OpenAI содержит пустой ответ")
         return ""
+    dialog_context.messages.append(response.choices[0].message)
     return content.strip()
 
 
@@ -380,30 +418,69 @@ async def dialog(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].append(update.message.text)
-    context.user_data["dialog"].append("Какой-то ответ")
-    await update.message.reply_text(text="Какой-то ответ")
+    context.user_data["dialog"].messages.append(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": update.message.text,
+                },
+            ],
+        },
+    )
+    response = send_to_open_ai(context.user_data["dialog"])
+    await update.message.reply_text(text=response)
     return DIALOG
 
 
+async def meme_explanation_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога объяснения мема."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    context.user_data["dialog"].messages.append(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": update.message.text,
+                },
+            ],
+        },
+    )
+    response = send_to_open_ai(context.user_data["dialog"])
+
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.effective_chat is None:
+        raise BadArgumentError(EFFECTIVE_CHAT_ARG)
+    context.user_data["dialog"] = []
+    keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+    await update.message.reply_text(text=response, reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+    return MEME_EXPL_DIALOG
+
+
 async def finish_dialog(update: Update, context: CallbackContext) -> int:
-    """Завершает диалог."""
+    """Хэндлер завершения диалога."""
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     await update.message.reply_text(
-        text="Вот таким был диалог: \n" + "\n".join(context.user_data["dialog"]),
+        text="Диалог завершен",
         reply_markup=ReplyKeyboardRemove(),
     )
-    """Хэндлер завершения диалога"""
+    context.user_data["dialog"] = None
     return await start(update, context)
 
 
 async def remove_chat_buttons(
     update: Update,
     context: CallbackContext,
-    msg_text: str = r"_It is not the message you are looking for\.\.\._",
+    msg_text: str = "-",
 ) -> None:
     """Delete buttons below the chat.
 
@@ -429,7 +506,6 @@ async def handle_user_reply(update: Update, context: CallbackContext) -> None:
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -460,7 +536,17 @@ conv_handler = ConversationHandler(
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
         CODE_EXPL: [CallbackQueryHandler(code_explanation), MessageHandler(filters.TEXT, code_explanation)],
         USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
-        MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
+        MEME_EXPL: [
+            CallbackQueryHandler(meme_explanation),
+            MessageHandler(filters.PHOTO, meme_explanation),
+            MessageHandler(filters.ATTACHMENT, meme_explanation),
+            CommandHandler("start", start),
+        ],
+        MEME_EXPL_DIALOG: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, meme_explanation_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
         DIALOG: [
             MessageHandler(~filters.COMMAND, dialog),
             CommandHandler("start", start),
