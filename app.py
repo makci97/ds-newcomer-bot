@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     HELP_FACTORY,
     EDA,
     MEME_EXPL,
+    MEME_NEED_REACT,
     MEME_EXPL_DIALOG,
     USER_SETTINGS,
     INTERVIEW_HARD,
@@ -66,7 +67,7 @@ if TYPE_CHECKING:
     ML_TASK,
     USER_REPLY,
     DIALOG,
-) = range(24)
+) = range(25)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -479,14 +480,49 @@ async def meme_explanation(update: Update, context: CallbackContext) -> int:
         file = await update.message.effective_attachment.get_file()
     if file is None:
         return MEME_EXPL
-    await update.message.reply_text(text="Анализируем мем...")
+    await update.message.reply_text(text="Изучаю мем...")
     data = await file.download_as_bytearray()
     explanation = explain_meme(data, context)
-    keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+    finish_dialog_keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
     await update.message.reply_text(
         text=f"{explanation}",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(finish_dialog_keyboard, resize_keyboard=True),
     )
+    need_react_keyboard = [
+        [InlineKeyboardButton("Да", callback_data="NEED_MEME_REACTION_YES")],
+        [InlineKeyboardButton("Нет", callback_data="NEED_MEME_REACTION_NO")],
+    ]
+    await update.message.reply_text(
+        text="Подсказать, как смешно ответить?",
+        reply_markup=InlineKeyboardMarkup(need_react_keyboard),
+    )
+    return MEME_NEED_REACT
+
+
+async def meme_need_reaction(update: Update, context: CallbackContext) -> int:
+    """Хэндлер вопроса, нужно ли сгенерировать реакцию на мем."""
+    if update.callback_query is None:
+        raise BadArgumentError(CALLBACK_QUERY_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.callback_query.data == "NEED_MEME_REACTION_YES":
+        message = await update.callback_query.edit_message_text("Ок, генерирую ответ...")
+        context.user_data["dialog"].messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": """Представьте, что вам прислали в чат мем. Вам нужно отреагировать на него в чате
+                         так, чтобы показать, что вы его поняли.""",
+                    },
+                ],
+            },
+        )
+        response = send_to_open_ai(context.user_data["dialog"])
+        await message.edit_text(response)  # type: ignore   # noqa: PGH003
+    else:
+        await update.callback_query.edit_message_text("Ок, не генерирую ответ")
     return MEME_EXPL_DIALOG
 
 
@@ -673,6 +709,11 @@ conv_handler = ConversationHandler(
             MessageHandler(filters.PHOTO, meme_explanation),
             MessageHandler(filters.ATTACHMENT, meme_explanation),
             CommandHandler("start", start),
+        ],
+        MEME_NEED_REACT: [
+            CallbackQueryHandler(meme_need_reaction),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
         ],
         MEME_EXPL_DIALOG: [
             MessageHandler(filters.TEXT & ~filters.COMMAND, meme_explanation_dialog),
