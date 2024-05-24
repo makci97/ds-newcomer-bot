@@ -369,14 +369,14 @@ async def finish_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     await update.message.reply_text(
-        text="Вот таким был диалог: \n" + "\n".join(context.user_data["dialog"]), reply_markup=ReplyKeyboardRemove()
+        text="Вот таким был диалог: \n" + "\n".join(context.user_data["dialog"]), reply_markup=ReplyKeyboardRemove(),
     )
     """Хэндлер завершения диалога"""
     return await start(update, context)
 
 
 async def remove_chat_buttons(
-    update: Update, context: CallbackContext, msg_text: str = r"_It is not the message you are looking for\.\.\._"
+    update: Update, context: CallbackContext, msg_text: str = r"_It is not the message you are looking for\.\.\._",
 ) -> None:
     """Delete buttons below the chat.
 
