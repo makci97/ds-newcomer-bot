@@ -391,7 +391,7 @@ def explain_meme(image: bytearray, context: CallbackContext) -> str:
                     },
                 },
             ],
-        }
+        },
     )
     return send_to_open_ai(dialog_context)
 
