@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
+from openai.types.beta.threads import MessageCreateParams
 from telegram import (
     Document,
     File,
@@ -324,18 +325,6 @@ async def eda(update: Update, context: CallbackContext) -> int:
     stream_dataset.seek(0)
     dataset_file: FileObject = client.files.create(file=stream_dataset, purpose="assistants")
 
-    logger.info("Create task for model")
-    thread: Thread = client.beta.threads.create()
-    client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content="""In separate first message:
-        Provide short overview for features in dataset.
-        Choose best candidate for target in ML task among columns.
-        Response me with conclusion.
-        """,
-    )
-
     logger.info("Create assistent for working with dataset")
     eda_assistant: Assistant = client.beta.assistants.create(
         instructions="""You are an excellent senior Data Scientist with 10 years of experience.
@@ -350,15 +339,29 @@ async def eda(update: Update, context: CallbackContext) -> int:
         tool_resources={"code_interpreter": {"file_ids": [dataset_file.id]}},
     )
 
+    logger.info("Create task for model")
+    messages: list[MessageCreateParams] = [
+        MessageCreateParams(
+            role="user",
+            content="""In separate first message:
+        Provide short overview for features in dataset.
+        Choose best candidate for target in ML task among columns.
+        Response me with conclusion.
+        """,
+        ),
+    ]
+    thread: Thread = client.beta.threads.create(messages=messages)
+
     logger.info("Process dataset")
     await update.message.reply_text(text="Обрабатываем датасет")
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
+        messages.append(MessageCreateParams(role="assistant", content=text))
         await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
-    client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content="""In separate second message:
+    messages.append(
+        MessageCreateParams(
+            role="user",
+            content="""In separate second message:
         Construct new features based solely on the columns present in the dataset.
 
         In your response:
@@ -373,7 +376,9 @@ async def eda(update: Update, context: CallbackContext) -> int:
         - Respond with the list of new features, formulae, and explanations without any welcoming or accompanying text.
         - You have not seen the data yet, so do not construct features based on concrete names of categories.
         """,
+        ),
     )
+    thread = client.beta.threads.create(messages=messages)
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
         await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 

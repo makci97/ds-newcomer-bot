@@ -52,6 +52,8 @@ def gen_messages_from_eda_stream(thread: Thread, eda_assistant: Assistant) -> ty
                     if isinstance(content, TextContentBlock):
                         text: str = content.text.value
                         logger.debug(f"{text=}")
+                        text = text.replace("\\n", "\n")
+                        logger.debug(f"{text=}")
                         for chunk in text_splitter(text=text):
                             try:
                                 yield chunk
