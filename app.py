@@ -4,8 +4,6 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
-from openai.types.beta.thread import Thread
-from openai.types.file_object import FileObject
 from telegram import (
     File,
     InlineKeyboardButton,
@@ -34,7 +32,11 @@ from utils.helpers import check_user_settings, single_text2text_query
 from utils.prompts import CodeExplanationPrompt
 
 if TYPE_CHECKING:
+    from openai.types.beta.assistant import Assistant
+    from openai.types.beta.thread import Thread
+    from openai.types.beta.threads import Message, Run
     from openai.types.chat.chat_completion import ChatCompletion
+    from openai.types.file_object import FileObject
 
 # Define states
 (
@@ -257,7 +259,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(MESSAGE_ARG)
 
     logger.info("Download dataset from chat")
-    stream_dataset = io.BytesIO()
+    stream_dataset: io.BytesIO = io.BytesIO()
     file: File = await context.bot.get_file(update.message.document)
     await file.download_to_memory(stream_dataset)
 
@@ -267,14 +269,14 @@ async def eda(update: Update, context: CallbackContext) -> int:
 
     logger.info("Create task for model")
     thread: Thread = client.beta.threads.create()
-    task_message = client.beta.threads.messages.create(
+    task_message: Message = client.beta.threads.messages.create(
         thread_id=thread.id,
         role="user",
         content="Describe this dataset.",
     )
 
     logger.info("Create assistent for working with dataset")
-    eda_assistant = client.beta.assistants.create(
+    eda_assistant: Assistant = client.beta.assistants.create(
         instructions="""You are an excellent senior Data Scientist with 10 years of experience.
         You make Exploratory Data Analysis for recieved datasets.
         Split messages to chunck which fewer than 3000 chars.
@@ -287,7 +289,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
 
     logger.info("Process dataset")
     await update.message.reply_text(text="Обрабатываем датасет")
-    run = client.beta.threads.runs.create_and_poll(
+    run: Run = client.beta.threads.runs.create_and_poll(
         thread_id=thread.id,
         assistant_id=eda_assistant.id,
     )
