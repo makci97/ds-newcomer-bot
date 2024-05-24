@@ -1,4 +1,3 @@
-import base64
 import io
 from io import BytesIO
 from typing import TYPE_CHECKING
@@ -507,17 +506,9 @@ async def meme_need_reaction(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(USER_DATA_ARG)
     if update.callback_query.data == "NEED_MEME_REACTION_YES":
         message = await update.callback_query.edit_message_text("Ок, генерирую ответ...")
-        context.user_data["dialog"].messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": """Представьте, что вам прислали в чат мем. Вам нужно отреагировать на него в чате
-                         так, чтобы показать, что вы его поняли.""",
-                    },
-                ],
-            },
+        context.user_data["dialog"].append_user_text(
+            """Представьте, что вам прислали в чат мем. Вам нужно отреагировать на него в чате так, чтобы показать,
+             что вы его поняли.""",
         )
         response = send_to_open_ai(context.user_data["dialog"])
         await message.edit_text(response)  # type: ignore   # noqa: PGH003
@@ -530,34 +521,19 @@ def explain_meme(image: bytearray, context: CallbackContext) -> str:
     """Объяснить мем по изображению."""
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    bytes_data = bytes(image)
-    base64_encoded = base64.b64encode(bytes_data)
-    base64_string = base64_encoded.decode("utf-8")
+
     dialog_context = DialogContext(
         model="gpt-4o",
         max_tokens=1024,
         temperature=0.5,
     )
     context.user_data["dialog"] = dialog_context
-    dialog_context.messages.append(
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": """Представь, что ты столкнулся с мемом, который вызывает у тебя смех. Важно не описать
-                     картинку, а понять, почему этот мем смешной. Ответь коротко на следующие вопросы: Какие элементы
-                     мема вызывают смех? Какая основная идея или шутка заложена в меме? Есть ли какие-либо культурные
-                     или интернет-отсылки, которые следует знать, чтобы понять мем? Ответ не структурируй.""",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_string}",
-                    },
-                },
-            ],
-        },
+    dialog_context.append_user_image(
+        image,
+        """Представь, что ты столкнулся с мемом, который вызывает у тебя
+     смех. Важно не описать картинку, а понять, почему этот мем смешной. Ответь коротко на следующие вопросы: Какие
+     элементы мема вызывают смех? Какая основная идея или шутка заложена в меме? Есть ли какие-либо культурные или
+     интернет-отсылки, которые следует знать, чтобы понять мем? Ответ не структурируй.""",
     )
     return send_to_open_ai(dialog_context)
 
@@ -584,17 +560,7 @@ async def dialog(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].messages.append(
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": update.message.text,
-                },
-            ],
-        },
-    )
+    context.user_data["dialog"].append_user_text(update.message.text)
     response = send_to_open_ai(context.user_data["dialog"])
     await update.message.reply_text(text=response)
     return DIALOG
@@ -606,17 +572,7 @@ async def meme_explanation_dialog(update: Update, context: CallbackContext) -> i
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].messages.append(
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": update.message.text,
-                },
-            ],
-        },
-    )
+    context.user_data["dialog"].append_user_text(update.message.text)
     response = send_to_open_ai(context.user_data["dialog"])
 
     if context.user_data is None:
