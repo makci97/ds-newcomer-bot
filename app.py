@@ -473,7 +473,8 @@ async def eda(update: Update, context: CallbackContext) -> int:
 
         Important constraints:
         - Use only the columns contained in the dataset.
-        - Do not suggest collecting additional data or adding anything that cannot be calculated from the existing columns.
+        - Do not suggest collecting additional data or
+          adding anything that cannot be calculated from the existing columns.
         - Respond with the list of new features, formulae, and explanations without any welcoming or accompanying text.
         - You have not seen the data yet, so do not construct features based on concrete names of categories.
         """,
