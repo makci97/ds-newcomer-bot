@@ -1,6 +1,17 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, Update
-from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, ConversationHandler
+from io import BytesIO
 
+from loguru import logger
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram.ext import (
+    CallbackContext,
+    CallbackQueryHandler,
+    CommandHandler,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
+
+from config.openai_client import generate_response, generate_transcription
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
@@ -29,8 +40,9 @@ from utils.helpers import check_user_settings
     HARD,
     ALGO_TASK,
     ML_TASK,
+    USER_REPLY,
 ) = range(
-    21,
+    22,
 )
 
 CALLBACK_QUERY_ARG = "update.callback_query"
@@ -97,24 +109,23 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await query.answer()
     choice = query.data
-    if choice == "INTERVIEW_PREP" and check_user_settings(context):
-        await query.edit_message_text(
-            text=f"Уровень подготовки:\
-            {context.user_data['interview_hard']} Уровень сложности: {context.user_data['questions_hard']}",  # type: ignore  # noqa: PGH003
+    if choice == "INTERVIEW_PREP" and check_user_settings(
+        context,
+    ):  # context.user_data['interview_hard'] context.user_data['questions_hard']
+        await update.callback_query.edit_message_text(  # type: ignore  # noqa: PGH003
+            text="Please send an audio file or text reply.",
         )
-        return ConversationHandler.END
+        return USER_REPLY
     if choice == "ALGO_TASK" and check_user_settings(context):
-        await query.edit_message_text(
-            text=f"Уровень подготовки:\
-                  {context.user_data['interview_hard']} Уровень сложности: {context.user_data['questions_hard']}",  # type: ignore  # noqa: PGH003
+        await update.callback_query.edit_message_text(  # type: ignore  # noqa: PGH003
+            text="Please send an audio file or text reply.",
         )
-        return ConversationHandler.END
+        return USER_REPLY
     if choice == "ML_TASK" and check_user_settings(context):
-        await query.edit_message_text(
-            text=f"Уровень подготовки: \
-                {context.user_data['interview_hard']} Уровень сложности: {context.user_data['questions_hard']}",  # type: ignore  # noqa: PGH003
+        await update.callback_query.edit_message_text(  # type: ignore  # noqa: PGH003
+            text="Please send an audio file or text reply.",
         )
-        return ConversationHandler.END
+        return USER_REPLY
     if choice == "USER_SETTINGS":
         keyboard = [
             [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],
@@ -261,6 +272,28 @@ async def cancel(update: Update, _: CallbackContext) -> int:
     return ConversationHandler.END
 
 
+async def handle_user_reply(update: Update, context: CallbackContext) -> None:
+    """обработка  ответа от пользователя."""
+    if update.message.voice:  # type: ignore  # noqa: PGH003
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)  # type: ignore  # noqa: PGH003
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        transcription = generate_transcription(audio_bytes)
+
+        reply = generate_response(transcription)
+        await update.message.reply_text(reply)  # type: ignore  # noqa: PGH003
+
+        logger.info("user:", audio_file.file_path)
+        logger.info("transcription:", transcription)
+        logger.info("assistant:", reply)
+
+    if update.message.text:  # type: ignore  # noqa: PGH003
+        reply = generate_response(update.message.text)  # type: ignore  # noqa: PGH003
+        await update.message.reply_text(reply)  # type: ignore  # noqa: PGH003
+
+
 """Run the bot."""
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
@@ -271,6 +304,7 @@ conv_handler = ConversationHandler(
         USER_SETTINGS: [CallbackQueryHandler(user_settings)],
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
+        USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )
