@@ -25,9 +25,9 @@ from config.openai_client import client, generate_response, generate_transcripti
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
-from utils.constants import MAX_TOKENS, TEMPERATURE, ModelName
+from utils.constants import MAX_TOKENS, TEMPERATURE, CodePromptMode, ModelName, TaskPromptMode
 from utils.helpers import check_user_settings, single_text2text_query
-from utils.prompts import CodeExplanationPrompt
+from utils.prompts import CodePrompt, Prompt, TaskPrompt
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -38,9 +38,9 @@ if TYPE_CHECKING:
     KNOWLEDGE_GAIN,
     INTERVIEW_PREP,
     PROBLEM_SOL,
-    CODE_EXPL,
-    CODE_WRITING,
-    PROBLEM_HELP,
+    CODE_HELP,
+    TASK_HELP,
+    HELP_FACTORY,
     EDA,
     MEME_EXPL,
     USER_SETTINGS,
@@ -105,10 +105,9 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
         return KNOWLEDGE_GAIN
     if choice == "PROBLEM_SOL":
         keyboard = [
-            [InlineKeyboardButton("Объясни код", callback_data="CODE_EXPL")],
-            [InlineKeyboardButton("Напиши код", callback_data="CODE_WRITING")],
-            [InlineKeyboardButton("Помоги решить задачу", callback_data="PROBLEM_HELP")],
-            [InlineKeyboardButton("EDA датасета", callback_data="EDA")],
+            [InlineKeyboardButton("Скину описание задачи", callback_data="TASK_HELP")],
+            [InlineKeyboardButton("Скину код", callback_data="CODE_HELP")],
+            [InlineKeyboardButton("Скину датасет", callback_data="EDA")],
             [InlineKeyboardButton("Диалог", callback_data="DIALOG")],
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
@@ -171,32 +170,38 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901, PLR0912
+async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901
     """хэндлер выбора помощи в решении задач."""
     query = update.callback_query
     if query is None:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await query.answer()
     choice = query.data
-    if choice == "CODE_EXPL":
+
+    if choice == "CODE_HELP":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
+        keyboard = [
+            [InlineKeyboardButton("Объяснить", callback_data=CodePromptMode.EXPLAIN)],
+            [InlineKeyboardButton("Пофиксить", callback_data=CodePromptMode.FIND_BUG)],
+            [InlineKeyboardButton("Отрефакторить", callback_data=CodePromptMode.REFACTOR)],
+            [InlineKeyboardButton("Поревьюить", callback_data=CodePromptMode.REVIEW)],
+            [InlineKeyboardButton("BACK", callback_data="BACK")],
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text="Введите код, который нужно объяснить:", reply_markup=reply_markup)
-        return CODE_EXPL
-    if choice == "CODE_WRITING":
-        if update.callback_query is None:
-            raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(text="Скоро мы научимся писать код. Беседа завершена.")
-        return ConversationHandler.END
-    if choice == "PROBLEM_HELP":
-        if update.callback_query is None:
-            raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(
-            text="Скоро мы научимся помогать в решении задач. Беседа завершена.",
-        )
-        return ConversationHandler.END
+        await query.edit_message_text(text="Что нужно сделать с кодом?", reply_markup=reply_markup)
+        return CODE_HELP
+
+    if choice == "TASK_HELP":
+        keyboard = [
+            [InlineKeyboardButton("Подготовить детальное описание", callback_data=TaskPromptMode.INSTRUCT)],
+            [InlineKeyboardButton("Написать готовый код", callback_data=TaskPromptMode.IMPLEMENT)],
+            [InlineKeyboardButton("BACK", callback_data="BACK")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text="Что нужно сделать на основе описания?", reply_markup=reply_markup)
+        return TASK_HELP
+
     if choice == "EDA":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
@@ -220,21 +225,64 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def code_explanation(update: Update, context: CallbackContext) -> int:
-    """Хэндлер объяснения кода."""
+async def code_help(update: Update, context: CallbackContext) -> int:
+    """Хэндлер помощи по коду."""
     query = update.callback_query
-    if query and query.data == "CANCEL":
+    if query is None:
+        raise BadArgumentError(CALLBACK_QUERY_ARG)
+    await query.answer()
+    choice = query.data
+    if choice == "BACK":
         return await start(update, context)
-    if update.message is None or update.message.text is None:
+
+    context.user_data["prompt_type"] = "code_help"
+    context.user_data["prompt_mode"] = choice
+
+    await query.edit_message_text(text="Ваш код:")
+    return HELP_FACTORY
+
+
+async def task_help(update: Update, context: CallbackContext) -> int:
+    """Хэндлер помощи по описанию задачи."""
+    query = update.callback_query
+    if query is None:
+        raise BadArgumentError(CALLBACK_QUERY_ARG)
+    await query.answer()
+    choice = query.data
+    if choice == "BACK":
+        return await start(update, context)
+
+    context.user_data["prompt_type"] = "task_help"
+    context.user_data["prompt_mode"] = query.data
+
+    await query.edit_message_text(text="Описание вашей задачи:")
+    return HELP_FACTORY
+
+
+async def help_factory(update: Update, context: CallbackContext) -> int:
+    """Хэндлер запроса-ответа для помощи по коду/заданию."""
+    if update.message is None or (user_input := update.message.text) is None:
         raise BadArgumentError(MESSAGE_ARG)
-    code: str = update.message.text
-    prompt: CodeExplanationPrompt = CodeExplanationPrompt(code=code)
+
+    if context.user_data["prompt_type"] == "code_help":  # type: ignore[index]
+        prompt: Prompt = CodePrompt(
+            code=user_input,
+            mode=context.user_data["prompt_mode"],  # type: ignore[index]
+        )  # type: ignore[call-overload]
+
+    if context.user_data["prompt_type"] == "task_help":  # type: ignore[index]
+        prompt = TaskPrompt(
+            task=user_input,
+            mode=context.user_data["prompt_mode"],  # type: ignore[index]
+        )  # type: ignore[call-overload]
+
     explanation: str = single_text2text_query(
         model=ModelName.GPT_4O,
         prompt=prompt,
         max_tokens=MAX_TOKENS,
         temperature=TEMPERATURE,
     )
+
     await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
     return await start(update, context)
 
@@ -458,7 +506,9 @@ conv_handler = ConversationHandler(
         USER_SETTINGS: [CallbackQueryHandler(user_settings)],
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
-        CODE_EXPL: [CallbackQueryHandler(code_explanation), MessageHandler(filters.TEXT, code_explanation)],
+        CODE_HELP: [CallbackQueryHandler(code_help)],
+        TASK_HELP: [CallbackQueryHandler(task_help)],
+        HELP_FACTORY: [CallbackQueryHandler(task_help), MessageHandler(filters.TEXT, help_factory)],
         USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
         DIALOG: [
