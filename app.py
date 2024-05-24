@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 from telegram import (
-    File,
     Document,
+    File,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
