@@ -160,10 +160,10 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
 async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     """хэндлер выбора прокачки знаний."""
     query = update.callback_query
-    if 'interview_hard' not in context.user_data: # type: ignore  # noqa: PGH003
-        context.user_data['interview_hard'] = "JUNIOR" # type: ignore  # noqa: PGH003
-    if 'questions_hard' not in context.user_data: # type: ignore  # noqa: PGH003
-        context.user_data['questions_hard'] = "EASY" # type: ignore  # noqa: PGH003
+    if "interview_hard" not in context.user_data:  # type: ignore  # noqa: PGH003
+        context.user_data["interview_hard"] = "JUNIOR"  # type: ignore  # noqa: PGH003
+    if "questions_hard" not in context.user_data:  # type: ignore  # noqa: PGH003
+        context.user_data["questions_hard"] = "EASY"  # type: ignore  # noqa: PGH003
     if query is None:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await query.answer()
