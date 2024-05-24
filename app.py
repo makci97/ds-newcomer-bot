@@ -137,46 +137,51 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     if choice == "INTERVIEW_PREP" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        context.user_data["dialog"] = []
-        context.user_data["topic"] = ""
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
         keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,  # type: ignore[arg-type]
-            text=f"Уровень подготовки: {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\n",
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки:\
+                  {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\n",  # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
         )
         return DIALOG
     if choice == "ALGO_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        context.user_data["dialog"] = []
-        context.user_data["topic"] = ""
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
         keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"Уровень подготовки: {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\nНа какую тему задачу?",
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки:\
+                  {context.user_data['interview_hard']}\nУровень заданий:"  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему задачу?",  # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return ALGO_DIALOG
     if choice == "ML_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        context.user_data["dialog"] = []
-        context.user_data["topic"] = ""
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
         keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"Уровень подготовки: {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\nНа какую тему хочешь задачу?",
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки:\
+                  {context.user_data['interview_hard']}\nУровень заданий:"  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь задачу?",  # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return DIALOG
     if choice == "USER_SETTINGS":
         keyboard = [
-            [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],
-            [InlineKeyboardButton("Сложность заданий", callback_data="QUESTIONS_HARD")],
-            [InlineKeyboardButton("BACK", callback_data="BACK")],
+            [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],  # type: ignore  # noqa: PGH003
+            [InlineKeyboardButton("Сложность заданий", callback_data="QUESTIONS_HARD")],  # type: ignore  # noqa: PGH003
+            [InlineKeyboardButton("BACK", callback_data="BACK")],  # type: ignore  # noqa: PGH003
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)  # type: ignore  # noqa: PGH003
         await query.edit_message_text(text="Настройки:", reply_markup=reply_markup)
         return USER_SETTINGS
     if choice == "BACK":
@@ -423,7 +428,7 @@ async def algo_dialog(update: Update, context: CallbackContext) -> int:
     )
 
     await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
-    return DIALOG
+    return ALGO_DIALOG
 
 
 async def dialog(update: Update, context: CallbackContext) -> int:
