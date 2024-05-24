@@ -44,6 +44,7 @@ from utils.prompts import (
     TaskPrompt,
     TestMakerPrompt,
 )
+from utils.utils import print_message
 
 if TYPE_CHECKING:
     from openai.types.beta.assistant import Assistant
@@ -424,9 +425,14 @@ async def eda(update: Update, context: CallbackContext) -> int:
         instructions="""You are an excellent senior Data Scientist with 10 years of experience.
         You make Exploratory Data Analysis for recieved datasets.
         Probably dataset will be in csv format.
-        Give anwser on russian except of column names or terms.
-        Give answer in correct Markdown format (use only Markdown's secial symbols), 
-        which can be pretty displayed in Telegram message.
+
+        Output formatting:
+        - Give anwser on russian except of column names or terms. It's important!
+        - Give answer in correct Markdown format (use only Markdown's secial symbols)
+        - For all headers use Telegram's "*bold*", and `code` formatiing
+        instead of Markdown's "#", "##"
+        - Must be possible to pretty display answer in Telegram message
+        - Don't use tables in response
         """,
         model="gpt-4o",
         tools=[{"type": "code_interpreter"}],
@@ -439,7 +445,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
             role="user",
             content="""In separate first message:
         Provide short overview for features in dataset.
-        Choose best candidate for target in ML task among columns.
+        Choose best candidate for target (the most useful info for business) in ML task among columns.
         Response me with conclusion.
         """,
         ),
@@ -447,16 +453,17 @@ async def eda(update: Update, context: CallbackContext) -> int:
     thread: Thread = client.beta.threads.create(messages=messages)
 
     logger.info("Process dataset")
-    await update.message.reply_text(text="Обрабатываем датасет")
+    await update.message.reply_text(text="Обрабатываем датасет (30-60 секунд)")
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
         messages.append(MessageCreateParams(role="assistant", content=text))
-        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+        await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN)
 
     messages.append(
         MessageCreateParams(
             role="user",
             content="""In separate second message:
         Construct new features based solely on the columns present in the dataset.
+        Features have to be correlated with target, but can't use target.
 
         In your response:
         0. Header
@@ -474,7 +481,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
     )
     thread = client.beta.threads.create(messages=messages)
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
-        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+        await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN)
 
     return await start(update, context)
 
@@ -681,6 +688,7 @@ async def algo_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
+    logger.debug(explanation)
     await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
     return ALGO_DIALOG
 
@@ -720,6 +728,7 @@ async def ml_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
+    logger.debug(explanation)
     await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
     return ML_DIALOG
 

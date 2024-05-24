@@ -1,5 +1,10 @@
 import typing
 
+from loguru import logger
+from telegram import Message
+from telegram.constants import ParseMode
+from telegram.error import NetworkError
+
 from utils.constants import MAX_TELEGRM_MESSAGE_LEN
 
 
@@ -11,7 +16,7 @@ def text_splitter(text: str, max_chunk_size: int = MAX_TELEGRM_MESSAGE_LEN) -> t
             chunks.append(f"{chunk}\n")
         else:
             chunks.extend([f"{sentence}." for sentence in chunk.split(".")])
-        chunks[-1] = chunks[-1][:-1]
+            chunks[-1] = chunks[-1][:-1]
 
     i: int = 0
     while i < len(chunks):
@@ -20,5 +25,14 @@ def text_splitter(text: str, max_chunk_size: int = MAX_TELEGRM_MESSAGE_LEN) -> t
         while j < len(chunks) and len(cur_text + chunks[j]) < max_chunk_size:
             cur_text += chunks[j]
             j += 1
-        yield cur_text
+        yield cur_text.strip()
         i = j
+
+
+async def print_message(message: Message, text: str, parse_mode: ParseMode = ParseMode.MARKDOWN) -> None:
+    """Print message with errors handling."""
+    try:
+        await message.reply_text(text, parse_mode=parse_mode)
+    except NetworkError:
+        logger.error(f"ТГ не смог напечатать текст: \n{text}")
+        await message.reply_text("Извините, Телеграм не переварил ответ")
