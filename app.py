@@ -146,7 +146,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     if choice == "ALGO_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        context.user_data["dialog"] = ""
+        context.user_data["dialog"] = []
         context.user_data["topic"] = ""
         keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
         await context.bot.send_message(
@@ -399,13 +399,13 @@ async def dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data["topic"] == "":
         context.user_data["topic"] = text
     else:
-        context.user_data["dialog"] += text
+        context.user_data["dialog"].append({"role": "user", "content": text})
 
     prompt: AlgoTaskMakerPrompt = AlgoTaskMakerPrompt(
         questions_hard=context.user_data["questions_hard"],
         interview_hard=context.user_data["interview_hard"],
         topic=context.user_data["topic"],
-        code=context.user_data["dialog"],
+        reply=context.user_data["dialog"],
     )
     explanation: str = single_text2text_query(
         model=ModelName.GPT_4O,

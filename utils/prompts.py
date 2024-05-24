@@ -49,7 +49,7 @@ class AlgoTaskMakerPrompt(Prompt):
     questions_hard: str
     interview_hard: str
     topic: str
-    code: str
+    reply: dict
 
     @property
     def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
@@ -64,5 +64,5 @@ class AlgoTaskMakerPrompt(Prompt):
         """
         return [
             {"role": "system", "content": prompt},
-            {"role": "user", "content": self.code},
+            *self.reply,
         ]
