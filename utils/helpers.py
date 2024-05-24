@@ -3,6 +3,7 @@
 import typing
 
 from loguru import logger
+from telegram.ext import CallbackContext
 
 from config.openai_client import client
 from utils.constants import ModelName
@@ -27,3 +28,8 @@ def single_text2text_query(model: ModelName, prompt: Prompt, max_tokens: int, te
     msg: str = "Empty OpenAI response context"
     logger.error(msg)
     raise ValueError(msg)
+
+
+def check_user_settings(context: CallbackContext) -> bool:
+    """проверка если настройки пользвателя заданы."""
+    return context.user_data["interview_hard"] and context.user_data["questions_hard"]  # type: ignore  # noqa: PGH003
