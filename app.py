@@ -75,7 +75,6 @@ if TYPE_CHECKING:
     HARD,
     ALGO_TASK,
     ML_TASK,
-    DIALOG,
     ALGO_DIALOG,
     ML_DIALOG,
     INTERVIEW_DIALOG,
@@ -83,7 +82,7 @@ if TYPE_CHECKING:
     TEST_MAKER,
     ROADMAP_MAKER,
     PSYCHO_HELP,
-) = range(31)
+) = range(30)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -138,7 +137,6 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             [InlineKeyboardButton("Скину описание задачи", callback_data="TASK_HELP")],
             [InlineKeyboardButton("Скину код", callback_data="CODE_HELP")],
             [InlineKeyboardButton("Скину датасет", callback_data="EDA")],
-            [InlineKeyboardButton("Диалог", callback_data="DIALOG")],
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -315,24 +313,6 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
             reply_markup=reply_markup,
         )
         return EDA
-    if choice == "DIALOG":
-        if context.user_data is None:
-            raise BadArgumentError(USER_DATA_ARG)
-        if update.effective_chat is None:
-            raise BadArgumentError(EFFECTIVE_CHAT_ARG)
-        context.user_data["dialog"] = []
-        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Начинаем диалог",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
-        )
-        context.user_data["dialog"] = DialogContext(
-            model=ModelName.GPT_4O,
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-        )
-        return DIALOG
     if choice == "BACK":
         return await start(update, context)
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
@@ -915,18 +895,6 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
     return PSYCHO_HELP
 
 
-async def dialog(update: Update, context: CallbackContext) -> int:
-    """Хэндлер диалога."""
-    if update.message is None:
-        raise BadArgumentError(MESSAGE_ARG)
-    if context.user_data is None:
-        raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].append_user_text(update.message.text)
-    response = send_to_open_ai(context.user_data["dialog"])
-    await update.message.reply_text(text=response)
-    return DIALOG
-
-
 async def meme_explanation_dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога объяснения мема."""
     if update.message is None:
@@ -1010,11 +978,6 @@ conv_handler = ConversationHandler(
         ],
         MEME_EXPL_DIALOG: [
             MessageHandler(filters.TEXT & ~filters.COMMAND, meme_explanation_dialog),
-            CommandHandler("start", start),
-            CommandHandler("finish_dialog", finish_dialog),
-        ],
-        DIALOG: [
-            MessageHandler(~filters.COMMAND, dialog),
             CommandHandler("start", start),
             CommandHandler("finish_dialog", finish_dialog),
         ],
