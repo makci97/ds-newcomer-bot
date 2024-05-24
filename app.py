@@ -172,7 +172,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901
+async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901, PLR0912
     """хэндлер выбора помощи в решении задач."""
     query = update.callback_query
     if query is None:
@@ -209,13 +209,11 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
         if update.effective_chat is None:
             raise BadArgumentError(EFFECTIVE_CHAT_ARG)
         context.user_data["dialog"] = []
-        keyboard = [
-            [KeyboardButton("/finish_dialog")],
-        ]
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Начинаем диалог",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return DIALOG
     if choice == "BACK":
