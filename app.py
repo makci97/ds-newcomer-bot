@@ -461,8 +461,10 @@ def explain_meme(image: bytearray, context: CallbackContext) -> str:
             "content": [
                 {
                     "type": "text",
-                    # TODO @ntrubkin: написать промт на объяснение IT мема
-                    "text": "Что на изображении?",
+                    "text": """Представь, что ты столкнулся с мемом, который вызывает у тебя смех. Важно не описать
+                     картинку, а понять, почему этот мем смешной. Ответь коротко на следующие вопросы: Какие элементы
+                     мема вызывают смех? Какая основная идея или шутка заложена в меме? Есть ли какие-либо культурные
+                     или интернет-отсылки, которые следует знать, чтобы понять мем? Ответ не структурируй.""",
                 },
                 {
                     "type": "image_url",
@@ -537,7 +539,6 @@ async def meme_explanation_dialog(update: Update, context: CallbackContext) -> i
         raise BadArgumentError(USER_DATA_ARG)
     if update.effective_chat is None:
         raise BadArgumentError(EFFECTIVE_CHAT_ARG)
-    context.user_data["dialog"] = []
     keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
     await update.message.reply_text(text=response, reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return MEME_EXPL_DIALOG
