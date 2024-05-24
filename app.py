@@ -1,6 +1,5 @@
-
-from io import BytesIO
 import base64
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -14,12 +13,11 @@ from telegram.ext import (
     filters,
 )
 
-from config.openai_client import generate_response, generate_transcription, client
+from config.openai_client import client, generate_response, generate_transcription
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.helpers import check_user_settings
-
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -48,8 +46,7 @@ if TYPE_CHECKING:
     ALGO_TASK,
     ML_TASK,
     USER_REPLY,
-) = range(
-    22)
+) = range(22)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -321,6 +318,7 @@ def explain_meme(data: bytearray) -> str:
         logger.error("OpenAI содержит пустой ответ")
         return ""
     return content.strip()
+
 
 async def cancel(update: Update, _: CallbackContext) -> int:
     """Завершает беседу."""
