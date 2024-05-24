@@ -130,4 +130,7 @@ dmypy.json
 Makefile
 
 .idea/
+*.
+
+.idea/
 *.iml
