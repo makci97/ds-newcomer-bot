@@ -24,14 +24,25 @@ from telegram.ext import (
     filters,
 )
 
-from config.openai_client import client, generate_response, generate_transcription
+from config.openai_client import client, generate_transcription
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, CodePromptMode, ModelName, TaskPromptMode
 from utils.dialog_context import DialogContext
 from utils.helpers import check_user_settings, single_text2text_query
-from utils.prompts import CodePrompt, Prompt, TaskPrompt
+from utils.prompts import (
+    AlgoTaskMakerPrompt,
+    CodePrompt,
+    InterviewMakerPrompt,
+    MLTaskMakerPrompt,
+    Prompt,
+    PsychoHelpPrompt,
+    QestionsAskerPrompt,
+    RoadMapMakerPrompt,
+    TaskPrompt,
+    TestMakerPrompt,
+)
 
 if TYPE_CHECKING:
     from openai.types.beta.assistant import Assistant
@@ -64,9 +75,15 @@ if TYPE_CHECKING:
     HARD,
     ALGO_TASK,
     ML_TASK,
-    USER_REPLY,
     DIALOG,
-) = range(24)
+    ALGO_DIALOG,
+    ML_DIALOG,
+    INTERVIEW_DIALOG,
+    QUESTIONS_ASKER,
+    TEST_MAKER,
+    ROADMAP_MAKER,
+    PSYCHO_HELP,
+) = range(30)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -106,6 +123,10 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             [InlineKeyboardButton("Подготовка к собесу", callback_data="INTERVIEW_PREP")],
             [InlineKeyboardButton("Задача по алгоритмам", callback_data="ALGO_TASK")],
             [InlineKeyboardButton("Задача по Ml", callback_data="ML_TASK")],
+            [InlineKeyboardButton("Вопросы на подумать", callback_data="QUESTIONS_ASKER")],
+            [InlineKeyboardButton("Создай тест", callback_data="TEST_MAKER")],
+            [InlineKeyboardButton("ROADMAP", callback_data="ROADMAP_MAKER")],
+            [InlineKeyboardButton("Психологическая помощь", callback_data="PSYCHO_HELP")],
             [InlineKeyboardButton("Настройки пользователя", callback_data="USER_SETTINGS")],
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
@@ -142,36 +163,109 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await query.answer()
     choice = query.data
-    if choice == "INTERVIEW_PREP" and check_user_settings(
-        context,
-    ):
+    if choice == "INTERVIEW_PREP" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(
-            text="Please send a voice message or text reply.",
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки:"
+            f"{context.user_data['interview_hard']}\nУровень заданий:"  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему будет собеседование?",  # type: ignore  # noqa: PGH003
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
         )
-        return USER_REPLY
+        return INTERVIEW_DIALOG
     if choice == "ALGO_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(
-            text="Please send a voice message or text reply.",
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки:"
+            f"{context.user_data['interview_hard']}\nУровень заданий:"  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь задачу?",  # type: ignore  # noqa: PGH003
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
-        return USER_REPLY
+        return ALGO_DIALOG
     if choice == "ML_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(
-            text="Please send a voice message or text reply.",
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки: "
+            f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь задачу?",  # type: ignore  # noqa: PGH003
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
-        return USER_REPLY
+        return ML_DIALOG
+    if choice == "QUESTIONS_ASKER" and check_user_settings(context):
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки: "
+            f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь вопросы?",  # type: ignore  # noqa: PGH003
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
+        )
+        return QUESTIONS_ASKER
+    if choice == "TEST_MAKER" and check_user_settings(context):
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки: "
+            f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь тест?",  # type: ignore  # noqa: PGH003
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
+        )
+        return TEST_MAKER
+    if choice == "ROADMAP_MAKER" and check_user_settings(context):
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text=f"Уровень подготовки: "
+            f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь RoadMap?",  # type: ignore  # noqa: PGH003
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
+        )
+        return ROADMAP_MAKER
+    if choice == "PSYCHO_HELP" and check_user_settings(context):
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
+        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
+            text="Чем могу помочь?",  # type: ignore  # noqa: PGH003
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
+        )
+        return PSYCHO_HELP
     if choice == "USER_SETTINGS":
         keyboard = [
-            [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],
-            [InlineKeyboardButton("Сложность заданий", callback_data="QUESTIONS_HARD")],
-            [InlineKeyboardButton("BACK", callback_data="BACK")],
+            [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],  # type: ignore  # noqa: PGH003
+            [InlineKeyboardButton("Сложность заданий", callback_data="QUESTIONS_HARD")],  # type: ignore  # noqa: PGH003
+            [InlineKeyboardButton("BACK", callback_data="BACK")],  # type: ignore  # noqa: PGH003
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)  # type: ignore  # noqa: PGH003
         await query.edit_message_text(text="Настройки:", reply_markup=reply_markup)
         return USER_SETTINGS
     if choice == "BACK":
@@ -179,7 +273,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901
+async def problem_solving(update: Update, context: CallbackContext) -> int:
     """хэндлер выбора помощи в решении задач."""
     query = update.callback_query
     if query is None:
@@ -542,6 +636,273 @@ def send_to_open_ai(dialog_context: DialogContext) -> str:
     return content.strip()
 
 
+async def algo_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+
+    if context.user_data["topic"] == "":
+        context.user_data["topic"] = text
+    else:
+        context.user_data["dialog"].append({"role": "user", "content": text})
+
+    prompt: AlgoTaskMakerPrompt = AlgoTaskMakerPrompt(
+        questions_hard=context.user_data["questions_hard"],
+        interview_hard=context.user_data["interview_hard"],
+        topic=context.user_data["topic"],
+        reply=context.user_data["dialog"],
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return ALGO_DIALOG
+
+
+async def ml_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+
+    if context.user_data["topic"] == "":
+        context.user_data["topic"] = text
+    else:
+        context.user_data["dialog"].append({"role": "user", "content": text})
+
+    prompt: MLTaskMakerPrompt = MLTaskMakerPrompt(
+        questions_hard=context.user_data["questions_hard"],
+        interview_hard=context.user_data["interview_hard"],
+        topic=context.user_data["topic"],
+        reply=context.user_data["dialog"],
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return ML_DIALOG
+
+
+async def interview_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+
+    if context.user_data["topic"] == "":
+        context.user_data["topic"] = text
+    else:
+        context.user_data["dialog"].append({"role": "user", "content": text})
+
+    prompt: InterviewMakerPrompt = InterviewMakerPrompt(
+        questions_hard=context.user_data["questions_hard"],
+        interview_hard=context.user_data["interview_hard"],
+        topic=context.user_data["topic"],
+        reply=context.user_data["dialog"],
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return INTERVIEW_DIALOG
+
+
+async def quest_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+
+    if context.user_data["topic"] == "":
+        context.user_data["topic"] = text
+    else:
+        context.user_data["dialog"].append({"role": "user", "content": text})
+
+    prompt: QestionsAskerPrompt = QestionsAskerPrompt(
+        questions_hard=context.user_data["questions_hard"],
+        interview_hard=context.user_data["interview_hard"],
+        topic=context.user_data["topic"],
+        reply=context.user_data["dialog"],
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return QUESTIONS_ASKER
+
+
+async def test_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+
+    if context.user_data["topic"] == "":
+        context.user_data["topic"] = text
+    else:
+        context.user_data["dialog"].append({"role": "user", "content": text})
+
+    prompt: TestMakerPrompt = TestMakerPrompt(
+        questions_hard=context.user_data["questions_hard"],
+        interview_hard=context.user_data["interview_hard"],
+        topic=context.user_data["topic"],
+        reply=context.user_data["dialog"],
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return TEST_MAKER
+
+
+async def roadmap_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+
+    if context.user_data["topic"] == "":
+        context.user_data["topic"] = text
+    else:
+        context.user_data["dialog"].append({"role": "user", "content": text})
+
+    prompt: RoadMapMakerPrompt = RoadMapMakerPrompt(
+        questions_hard=context.user_data["questions_hard"],
+        interview_hard=context.user_data["interview_hard"],
+        topic=context.user_data["topic"],
+        reply=context.user_data["dialog"],
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return ROADMAP_MAKER
+
+
+async def psyho_dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+
+    context.user_data["dialog"].append({"role": "user", "content": text})
+
+    prompt: PsychoHelpPrompt = PsychoHelpPrompt(
+        reply=context.user_data["dialog"],
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return PSYCHO_HELP
+
+
 async def dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога."""
     if update.message is None:
@@ -599,7 +960,7 @@ async def finish_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     await update.message.reply_text(
-        text="Диалог завершен",
+        text="Рад был помочь",
         reply_markup=ReplyKeyboardRemove(),
     )
     context.user_data["dialog"] = None
@@ -630,29 +991,6 @@ async def cancel(update: Update, _: CallbackContext) -> int:
     return ConversationHandler.END
 
 
-async def handle_user_reply(update: Update, context: CallbackContext) -> None:
-    """обработка  ответа от пользователя."""
-    if update.message is None:
-        raise BadArgumentError(MESSAGE_ARG)
-    if update.message.voice:
-        audio_file = await context.bot.get_file(update.message.voice.file_id)
-
-        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
-
-        transcription = generate_transcription(audio_bytes)
-
-        reply = generate_response(transcription)
-        await update.message.reply_text(reply)
-
-        logger.info("user:", audio_file.file_path)
-        logger.info("transcription:", transcription)
-        logger.info("assistant:", reply)
-
-    if update.message.text:
-        reply = generate_response(update.message.text)
-        await update.message.reply_text(reply)
-
-
 """Run the bot."""
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
@@ -667,7 +1005,6 @@ conv_handler = ConversationHandler(
         TASK_HELP: [CallbackQueryHandler(task_help)],
         HELP_FACTORY: [CallbackQueryHandler(task_help), MessageHandler(filters.TEXT, help_factory)],
         EDA: [CallbackQueryHandler(eda), MessageHandler(filters.ATTACHMENT, eda), CommandHandler("start", start)],
-        USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [
             CallbackQueryHandler(meme_explanation),
             MessageHandler(filters.PHOTO, meme_explanation),
@@ -681,6 +1018,41 @@ conv_handler = ConversationHandler(
         ],
         DIALOG: [
             MessageHandler(~filters.COMMAND, dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        ALGO_DIALOG: [
+            MessageHandler(~filters.COMMAND, algo_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        ML_DIALOG: [
+            MessageHandler(~filters.COMMAND, ml_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        INTERVIEW_DIALOG: [
+            MessageHandler(~filters.COMMAND, interview_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        QUESTIONS_ASKER: [
+            MessageHandler(~filters.COMMAND, quest_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        TEST_MAKER: [
+            MessageHandler(~filters.COMMAND, test_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        ROADMAP_MAKER: [
+            MessageHandler(~filters.COMMAND, roadmap_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        PSYCHO_HELP: [
+            MessageHandler(~filters.COMMAND, psyho_dialog),
             CommandHandler("start", start),
             CommandHandler("finish_dialog", finish_dialog),
         ],
