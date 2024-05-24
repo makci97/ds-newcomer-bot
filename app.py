@@ -4,7 +4,6 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
-from openai.types.beta.threads import TextContentBlock
 from telegram import (
     Document,
     File,
@@ -31,9 +30,8 @@ from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, CodePromptMode, ModelName, TaskPromptMode
 from utils.dialog_context import DialogContext
-from utils.helpers import check_user_settings, single_text2text_query
+from utils.helpers import check_user_settings, gen_messages_from_eda_stream, single_text2text_query
 from utils.prompts import CodePrompt, Prompt, TaskPrompt
-from utils.utils import text_splitter
 
 if TYPE_CHECKING:
     from openai.types.beta.assistant import Assistant
@@ -218,7 +216,9 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
         keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            text="Отправьте датасет в csv-формате, для которого хотите получить EDA:",
+            text="""Отправьте датасет в csv-формате.
+Если у вас пока нет датасета, можете скачать интересные не заезженные датасеты:
+https://www.kaggle.com/datasets?topic=trendingDataset """,
             reply_markup=reply_markup,
         )
         return EDA
@@ -329,15 +329,21 @@ async def eda(update: Update, context: CallbackContext) -> int:
     client.beta.threads.messages.create(
         thread_id=thread.id,
         role="user",
-        content="Describe this dataset.",
+        content="""In separate first message:
+        Provide short overview for features in dataset.
+        Choose best candidate for target in ML task among columns.
+        Response me with conclusion.
+        """,
     )
 
     logger.info("Create assistent for working with dataset")
     eda_assistant: Assistant = client.beta.assistants.create(
         instructions="""You are an excellent senior Data Scientist with 10 years of experience.
         You make Exploratory Data Analysis for recieved datasets.
-        Split messages to chunck which fewer than 3000 chars.
+        Probably dataset will be in csv format.
         Give anwser on russian except of column names or terms.
+        Give answer in correct Markdown format (use only Markdown's secial symbols), 
+        which can be pretty displayed in Telegram message.
         """,
         model="gpt-4o",
         tools=[{"type": "code_interpreter"}],
@@ -346,18 +352,30 @@ async def eda(update: Update, context: CallbackContext) -> int:
 
     logger.info("Process dataset")
     await update.message.reply_text(text="Обрабатываем датасет")
-    with client.beta.threads.runs.stream(
+    for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
+        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
+    client.beta.threads.messages.create(
         thread_id=thread.id,
-        assistant_id=eda_assistant.id,
-    ) as stream:
-        for event in stream:
-            if event.event == "thread.message.completed":
-                for content in event.data.content:
-                    if isinstance(content, TextContentBlock):
-                        text: str = content.text.value
-                        logger.debug(f"{text=}")
-                        for chunk in text_splitter(text=text):
-                            await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+        role="user",
+        content="""In separate second message:
+        Construct new features based solely on the columns present in the dataset.
+
+        In your response:
+        0. Header
+        1. Enumerate the features you suggest adding.
+        2. For each feature, provide a formula using the existing columns of the dataset.
+        3. Explain why each feature would be beneficial for an ML model.
+
+        Important constraints:
+        - Use only the columns contained in the dataset.
+        - Do not suggest collecting additional data or adding anything that cannot be calculated from the existing columns.
+        - Respond with the list of new features, formulae, and explanations without any welcoming or accompanying text.
+        - You have not seen the data yet, so do not construct features based on concrete names of categories.
+        """,
+    )
+    for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
+        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
     return await start(update, context)
 
