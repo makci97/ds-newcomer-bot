@@ -1,11 +1,15 @@
 """Helper functions."""
 
+import typing
+
 from loguru import logger
-from openai.types.chat.chat_completion import ChatCompletion
 
 from config.openai_client import client
 from utils.constants import ModelName
 from utils.prompts import Prompt
+
+if typing.TYPE_CHECKING:
+    from openai.types.chat.chat_completion import ChatCompletion
 
 
 def single_text2text_query(model: ModelName, prompt: Prompt, max_tokens: int, temperature: float) -> str:
