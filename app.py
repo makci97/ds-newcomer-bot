@@ -3,7 +3,14 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    Update,
+)
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -46,14 +53,21 @@ if TYPE_CHECKING:
     ALGO_TASK,
     ML_TASK,
     USER_REPLY,
-) = range(22)
+    DIALOG,
+) = range(23)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
+EFFECTIVE_CHAT_ARG = "update.effective_chat"
+USER_DATA_ARG = "context.user_data"
 
 
-async def start(update: Update, _: CallbackContext) -> int:
+async def start(update: Update, context: CallbackContext) -> int:
     """Начальный хэндлер дерева команд."""
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    await remove_chat_buttons(update, context)
+    context.user_data["dialog"] = []
     keyboard = [
         [InlineKeyboardButton("Прокачка знаний", callback_data="KNOWLEDGE_GAIN")],
         [InlineKeyboardButton("Помоги решить задачу", callback_data="PROBLEM_SOL")],
@@ -63,7 +77,7 @@ async def start(update: Update, _: CallbackContext) -> int:
     if update.message:  # When /start command is used
         await update.message.reply_text("Выберите задачу:", reply_markup=reply_markup)
     elif update.callback_query:
-        await update.callback_query.edit_message_text("Please choose:", reply_markup=reply_markup)
+        await update.callback_query.edit_message_text("Выберите задачу:", reply_markup=reply_markup)
     return TASK_CHOICE
 
 
@@ -92,6 +106,7 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             [InlineKeyboardButton("Напиши код", callback_data="CODE_WRITING")],
             [InlineKeyboardButton("Помоги решить задачу", callback_data="PROBLEM_HELP")],
             [InlineKeyboardButton("EDA датасета", callback_data="EDA")],
+            [InlineKeyboardButton("Диалог", callback_data="DIALOG")],
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -153,7 +168,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def problem_solving(update: Update, context: CallbackContext) -> int:
+async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901
     """хэндлер выбора помощи в решении задач."""
     query = update.callback_query
     if query is None:
@@ -179,6 +194,21 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
         await update.callback_query.edit_message_text(text="Скоро мы научимся EDA. Беседа завершена.")
         return ConversationHandler.END
+    if choice == "DIALOG":
+        if context.user_data is None:
+            raise BadArgumentError(USER_DATA_ARG)
+        if update.effective_chat is None:
+            raise BadArgumentError(EFFECTIVE_CHAT_ARG)
+        context.user_data["dialog"] = []
+        keyboard = [
+            [KeyboardButton("/finish_dialog")],
+        ]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Начинаем диалог",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+        )
+        return DIALOG
     if choice == "BACK":
         return await start(update, context)
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
@@ -284,6 +314,7 @@ async def meme_explanation(update: Update, context: CallbackContext) -> int:
         return await start(update, context)
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
+    await update.message.reply_text(text="Анализируем мем...")
     file = await update.message.photo[-1].get_file()
     data = await file.download_as_bytearray()
     explanation = explain_meme(data)
@@ -324,6 +355,48 @@ def explain_meme(data: bytearray) -> str:
         logger.error("OpenAI содержит пустой ответ")
         return ""
     return content.strip()
+
+
+async def dialog(update: Update, context: CallbackContext) -> int:
+    """Хэндлер диалога."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    context.user_data["dialog"].append(update.message.text)
+    context.user_data["dialog"].append("Какой-то ответ")
+    await update.message.reply_text(text="Какой-то ответ")
+    return DIALOG
+
+
+async def finish_dialog(update: Update, context: CallbackContext) -> int:
+    """Завершает диалог."""
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    await update.message.reply_text(
+        text="Вот таким был диалог: \n" + "\n".join(context.user_data["dialog"]),
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    """Хэндлер завершения диалога"""
+    return await start(update, context)
+
+
+async def remove_chat_buttons(
+    update: Update,
+    context: CallbackContext,
+    msg_text: str = r"_It is not the message you are looking for\.\.\._",
+) -> None:
+    """Delete buttons below the chat.
+
+    For now there are no way to delete kbd other than inline one, check
+        https://core.telegram.org/bots/api#updating-messages.
+    """
+    if update.effective_chat is None:
+        raise BadArgumentError(EFFECTIVE_CHAT_ARG)
+    msg = await context.bot.send_message(update.effective_chat.id, msg_text, reply_markup=ReplyKeyboardRemove())
+    await msg.delete()
 
 
 async def cancel(update: Update, _: CallbackContext) -> int:
@@ -370,6 +443,11 @@ conv_handler = ConversationHandler(
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
         USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
+        DIALOG: [
+            MessageHandler(~filters.COMMAND, dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )
