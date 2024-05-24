@@ -145,6 +145,8 @@ class TaskPrompt(Prompt):
             {"role": "system", "content": prompt},
             {"role": "user", "content": self.task},
         ]
+
+
 @dataclass
 class AlgoTaskMakerPrompt(Prompt):
     """Prompt builder for algo task scenario."""
@@ -165,6 +167,4 @@ class AlgoTaskMakerPrompt(Prompt):
                 без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
                 Когда пользователь пришлет решение разбери его и если решение не правильное приведи правильное
         """
-        return [
-            {"role": "system", "content": prompt},
-            *self.reply]
+        return [{"role": "system", "content": prompt}, *self.reply]
