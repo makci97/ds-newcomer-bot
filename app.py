@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from loguru import logger
+from openai.types.beta.threads import TextContentBlock
 from telegram import (
     File,
     InlineKeyboardButton,
@@ -30,11 +31,11 @@ from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, ModelName
 from utils.helpers import check_user_settings, single_text2text_query
 from utils.prompts import CodeExplanationPrompt
+from utils.utils import text_splitter
 
 if TYPE_CHECKING:
     from openai.types.beta.assistant import Assistant
     from openai.types.beta.thread import Thread
-    from openai.types.beta.threads import Message, Run
     from openai.types.chat.chat_completion import ChatCompletion
     from openai.types.file_object import FileObject
 
@@ -269,7 +270,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
 
     logger.info("Create task for model")
     thread: Thread = client.beta.threads.create()
-    task_message: Message = client.beta.threads.messages.create(
+    client.beta.threads.messages.create(
         thread_id=thread.id,
         role="user",
         content="Describe this dataset.",
@@ -289,33 +290,19 @@ async def eda(update: Update, context: CallbackContext) -> int:
 
     logger.info("Process dataset")
     await update.message.reply_text(text="Обрабатываем датасет")
-    run: Run = client.beta.threads.runs.create_and_poll(
+    with client.beta.threads.runs.stream(
         thread_id=thread.id,
         assistant_id=eda_assistant.id,
-    )
+    ) as stream:
+        for event in stream:
+            if event.event == "thread.message.completed":
+                for content in event.data.content:
+                    if isinstance(content, TextContentBlock):
+                        text: str = content.text.value
+                        logger.debug(f"{text=}")
+                        for chunk in text_splitter(text=text):
+                            await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
 
-    logger.info("Send answers")
-    if run.status == "completed":
-        response_messages = client.beta.threads.messages.list(
-            thread_id=thread.id,
-            order="asc",
-            after=task_message.id,
-        )
-        for data in response_messages.data:
-            if len(data.content) == 0:
-                logger.error(f"Empty {data=}")
-                continue
-
-            for one_content in data.content:
-                if hasattr(one_content, "text"):
-                    logger.debug(one_content.text.value)
-                    await update.message.reply_text(text=one_content.text.value, parse_mode=ParseMode.MARKDOWN)
-                else:
-                    logger.error(f"Message without text field {one_content=}")
-
-        return await start(update, context)
-
-    await update.message.reply_text(text="Этот датасет оказался нам не по зубам. Беседа завершена.")
     return await start(update, context)
 
 
