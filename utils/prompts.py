@@ -22,16 +22,14 @@ class Prompt(ABC):
 class CodeExplanationPrompt(Prompt):
     """Prompt builder for code explanation scenario."""
 
-    language: str
     code: str
 
     @property
     def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt to retrieve code explanation."""
-        prompt: str = f"""
+        prompt: str = """
             You are a virtual assistant for a data scientist.
-            They will send you some code in the {self.language} programming language.
-            Analyse, explain and interpret it.
+            They will send you some code, which you should analyse, explain and interpret.
 
             Your response should consist of two parts:
             1. Textual description of what the code does in general.

@@ -11,6 +11,7 @@ from telegram import (
     ReplyKeyboardRemove,
     Update,
 )
+from telegram.constants import ParseMode
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -24,7 +25,9 @@ from config.openai_client import client, generate_response, generate_transcripti
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
-from utils.helpers import check_user_settings
+from utils.constants import MAX_TOKENS, TEMPERATURE, ModelName
+from utils.helpers import check_user_settings, single_text2text_query
+from utils.prompts import CodeExplanationPrompt
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -168,7 +171,7 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901
+async def problem_solving(update: Update, context: CallbackContext) -> int:  # noqa: C901, PLR0912
     """хэндлер выбора помощи в решении задач."""
     query = update.callback_query
     if query is None:
@@ -176,7 +179,12 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
     await query.answer()
     choice = query.data
     if choice == "CODE_EXPL":
-        await code_explanation(update, context)
+        if update.callback_query is None:
+            raise BadArgumentError(CALLBACK_QUERY_ARG)
+        keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text="Введите код, который нужно объяснить:", reply_markup=reply_markup)
+        return CODE_EXPL
     if choice == "CODE_WRITING":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
@@ -200,13 +208,11 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
         if update.effective_chat is None:
             raise BadArgumentError(EFFECTIVE_CHAT_ARG)
         context.user_data["dialog"] = []
-        keyboard = [
-            [KeyboardButton("/finish_dialog")],
-        ]
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Начинаем диалог",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return DIALOG
     if choice == "BACK":
@@ -214,12 +220,23 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def code_explanation(update: Update, _: CallbackContext) -> int:
-    """Хэндлер выбора объяснения кода."""
-    if update.callback_query is None:
-        raise BadArgumentError(CALLBACK_QUERY_ARG)
-    await update.callback_query.edit_message_text(text="Скоро мы научимся объяснять код. Беседа завершена.")
-    return ConversationHandler.END
+async def code_explanation(update: Update, context: CallbackContext) -> int:
+    """Хэндлер объяснения кода."""
+    query = update.callback_query
+    if query and query.data == "CANCEL":
+        return await start(update, context)
+    if update.message is None or update.message.text is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    code: str = update.message.text
+    prompt: CodeExplanationPrompt = CodeExplanationPrompt(code=code)
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    return await start(update, context)
 
 
 async def user_settings(update: Update, context: CallbackContext) -> int:
@@ -441,6 +458,7 @@ conv_handler = ConversationHandler(
         USER_SETTINGS: [CallbackQueryHandler(user_settings)],
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
+        CODE_EXPL: [CallbackQueryHandler(code_explanation), MessageHandler(filters.TEXT, code_explanation)],
         USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
         DIALOG: [
