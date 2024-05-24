@@ -8,7 +8,19 @@ line-length = 120
 target-version = "py311"
 lint.select = ["ALL"]
 exclude = [".venv"]
-lint.ignore = ["D100", "D104", "D203", "D213", "RUF002", "RUF001", "D107", "ANN204", "ANN101"]
+lint.ignore = [
+    "D100",
+    "D104",
+    "D203",
+    "D213",
+    "RUF002",
+    "RUF001",
+    "D107",
+    "ANN204",
+    "ANN101",
+    "TD003",    # Missing issue link on the line following this _TODO
+    "FIX002",   # Line contains _TODO, consider resolving the issue
+]
 
 [tool.mypy]
 python_version = "3.11"
