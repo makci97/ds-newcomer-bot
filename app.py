@@ -146,7 +146,8 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
     if choice == "ALGO_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        context.user_data["dialog"] = []
+        context.user_data["dialog"] = ""
+        context.user_data["topic"] = ""
         keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -378,15 +379,8 @@ def explain_meme(data: bytearray) -> str:
     return content.strip()
 
 
-I = 0
-TOPIC: str = ""
-
-
 async def dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога."""
-    global I
-    global TOPIC
-    contex: str = ""
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
@@ -401,18 +395,17 @@ async def dialog(update: Update, context: CallbackContext) -> int:
 
     if update.message.text:
         text = update.message.text
-    if I == 0:
-        TOPIC = text
-        I += 1
-    else:
-        contex += text
 
-    code: str = contex
+    if context.user_data["topic"] == "":
+        context.user_data["topic"] = text
+    else:
+        context.user_data["dialog"] += text
+
     prompt: AlgoTaskMakerPrompt = AlgoTaskMakerPrompt(
         questions_hard=context.user_data["questions_hard"],
         interview_hard=context.user_data["interview_hard"],
-        topic=TOPIC,
-        code=code,
+        topic=context.user_data["topic"],
+        code=context.user_data["dialog"],
     )
     explanation: str = single_text2text_query(
         model=ModelName.GPT_4O,
