@@ -193,9 +193,7 @@ async def code_language(update: Update, context: CallbackContext) -> int:
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
     context.user_data["language"] = update.message.text  # type: ignore[index]
-    keyboard = [
-        [InlineKeyboardButton("Отмена", callback_data="CANCEL")],
-    ]
+    keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(text="Введите код, который нужно объяснить:", reply_markup=reply_markup)
     return CODE_EXPL
