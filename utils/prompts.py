@@ -114,7 +114,7 @@ class AlgoTaskMakerPrompt(Prompt):
         """
         return [
             {"role": "system", "content": prompt},
-            *self.reply,
+            *self.reply,]
 @dataclass
 class TaskPrompt(Prompt):
     """Prompt builder for code explanation scenario."""
