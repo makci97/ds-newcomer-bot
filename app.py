@@ -38,7 +38,6 @@ if TYPE_CHECKING:
     KNOWLEDGE_GAIN,
     INTERVIEW_PREP,
     PROBLEM_SOL,
-    CODE_LANG,
     CODE_EXPL,
     CODE_WRITING,
     PROBLEM_HELP,
@@ -58,7 +57,7 @@ if TYPE_CHECKING:
     ML_TASK,
     USER_REPLY,
     DIALOG,
-) = range(24)
+) = range(23)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -184,8 +183,8 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
             raise BadArgumentError(CALLBACK_QUERY_ARG)
         keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text="Введите язык, на котором написан код:", reply_markup=reply_markup)
-        return CODE_LANG
+        await query.edit_message_text(text="Введите код, который нужно объяснить:", reply_markup=reply_markup)
+        return CODE_EXPL
     if choice == "CODE_WRITING":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
@@ -221,20 +220,6 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:  # n
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
 
 
-async def code_language(update: Update, context: CallbackContext) -> int:
-    """Хэндлер выбора языка для объяснения кода."""
-    query = update.callback_query
-    if query and query.data == "CANCEL":
-        return await start(update, context)
-    if update.message is None:
-        raise BadArgumentError(MESSAGE_ARG)
-    context.user_data["language"] = update.message.text  # type: ignore[index]
-    keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(text="Введите код, который нужно объяснить:", reply_markup=reply_markup)
-    return CODE_EXPL
-
-
 async def code_explanation(update: Update, context: CallbackContext) -> int:
     """Хэндлер объяснения кода."""
     query = update.callback_query
@@ -243,8 +228,7 @@ async def code_explanation(update: Update, context: CallbackContext) -> int:
     if update.message is None or update.message.text is None:
         raise BadArgumentError(MESSAGE_ARG)
     code: str = update.message.text
-    language: str = context.user_data["language"]  # type: ignore[index]
-    prompt: CodeExplanationPrompt = CodeExplanationPrompt(language=language, code=code)
+    prompt: CodeExplanationPrompt = CodeExplanationPrompt(code=code)
     explanation: str = single_text2text_query(
         model=ModelName.GPT_4O,
         prompt=prompt,
@@ -474,7 +458,6 @@ conv_handler = ConversationHandler(
         USER_SETTINGS: [CallbackQueryHandler(user_settings)],
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
-        CODE_LANG: [CallbackQueryHandler(code_language), MessageHandler(filters.TEXT, code_language)],
         CODE_EXPL: [CallbackQueryHandler(code_explanation), MessageHandler(filters.TEXT, code_explanation)],
         USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
