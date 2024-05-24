@@ -1,4 +1,3 @@
-import base64
 import io
 from io import BytesIO
 from typing import TYPE_CHECKING
@@ -34,7 +33,10 @@ from utils.helpers import check_user_settings, single_text2text_query
 from utils.prompts import (
     AlgoTaskMakerPrompt,
     CodePrompt,
+    GenericUserTextPrompt,
     InterviewMakerPrompt,
+    MemeImagePrompt,
+    MemeNeedReactionPrompt,
     MLTaskMakerPrompt,
     Prompt,
     PsychoHelpPrompt,
@@ -62,6 +64,7 @@ if TYPE_CHECKING:
     HELP_FACTORY,
     EDA,
     MEME_EXPL,
+    MEME_NEED_REACT,
     MEME_EXPL_DIALOG,
     USER_SETTINGS,
     INTERVIEW_HARD,
@@ -75,7 +78,6 @@ if TYPE_CHECKING:
     HARD,
     ALGO_TASK,
     ML_TASK,
-    DIALOG,
     ALGO_DIALOG,
     ML_DIALOG,
     INTERVIEW_DIALOG,
@@ -138,7 +140,6 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             [InlineKeyboardButton("Скину описание задачи", callback_data="TASK_HELP")],
             [InlineKeyboardButton("Скину код", callback_data="CODE_HELP")],
             [InlineKeyboardButton("Скину датасет", callback_data="EDA")],
-            [InlineKeyboardButton("Диалог", callback_data="DIALOG")],
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -173,7 +174,8 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
             text=f"Уровень подготовки:"
             f"{context.user_data['interview_hard']}\nУровень заданий:"  # type: ignore  # noqa: PGH003
-            f"{context.user_data['questions_hard']}\nНа какую тему будет собеседование?",  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему будет собеседование?",
+            # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
         )
         return INTERVIEW_DIALOG
@@ -215,7 +217,8 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
             text=f"Уровень подготовки: "
             f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
-            f"{context.user_data['questions_hard']}\nНа какую тему хочешь вопросы?",  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь вопросы?",
+            # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return QUESTIONS_ASKER
@@ -243,7 +246,8 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
             text=f"Уровень подготовки: "
             f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
-            f"{context.user_data['questions_hard']}\nНа какую тему хочешь RoadMap?",  # type: ignore  # noqa: PGH003
+            f"{context.user_data['questions_hard']}\nНа какую тему хочешь RoadMap?",
+            # type: ignore  # noqa: PGH003
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return ROADMAP_MAKER
@@ -315,24 +319,6 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
             reply_markup=reply_markup,
         )
         return EDA
-    if choice == "DIALOG":
-        if context.user_data is None:
-            raise BadArgumentError(USER_DATA_ARG)
-        if update.effective_chat is None:
-            raise BadArgumentError(EFFECTIVE_CHAT_ARG)
-        context.user_data["dialog"] = []
-        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Начинаем диалог",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
-        )
-        context.user_data["dialog"] = DialogContext(
-            model=ModelName.GPT_4O,
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-        )
-        return DIALOG
     if choice == "BACK":
         return await start(update, context)
     raise BadChoiceError(choice)  # type: ignore  # noqa: PGH003
@@ -573,14 +559,38 @@ async def meme_explanation(update: Update, context: CallbackContext) -> int:
         file = await update.message.effective_attachment.get_file()
     if file is None:
         return MEME_EXPL
-    await update.message.reply_text(text="Анализируем мем...")
+    await update.message.reply_text(text="Изучаю мем...")
     data = await file.download_as_bytearray()
     explanation = explain_meme(data, context)
-    keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+    finish_dialog_keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
     await update.message.reply_text(
         text=f"{explanation}",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(finish_dialog_keyboard, resize_keyboard=True),
     )
+    need_react_keyboard = [
+        [InlineKeyboardButton("Да", callback_data="NEED_MEME_REACTION_YES")],
+        [InlineKeyboardButton("Нет", callback_data="NEED_MEME_REACTION_NO")],
+    ]
+    await update.message.reply_text(
+        text="Подсказать, как смешно ответить?",
+        reply_markup=InlineKeyboardMarkup(need_react_keyboard),
+    )
+    return MEME_NEED_REACT
+
+
+async def meme_need_reaction(update: Update, context: CallbackContext) -> int:
+    """Хэндлер вопроса, нужно ли сгенерировать реакцию на мем."""
+    if update.callback_query is None:
+        raise BadArgumentError(CALLBACK_QUERY_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+    if update.callback_query.data == "NEED_MEME_REACTION_YES":
+        message = await update.callback_query.edit_message_text("Ок, генерирую ответ...")
+        context.user_data["dialog"].messages.append(*MemeNeedReactionPrompt().messages)
+        response = send_to_open_ai(context.user_data["dialog"])
+        await message.edit_text(response)  # type: ignore   # noqa: PGH003
+    else:
+        await update.callback_query.edit_message_text("Ок, не генерирую ответ")
     return MEME_EXPL_DIALOG
 
 
@@ -588,35 +598,14 @@ def explain_meme(image: bytearray, context: CallbackContext) -> str:
     """Объяснить мем по изображению."""
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    bytes_data = bytes(image)
-    base64_encoded = base64.b64encode(bytes_data)
-    base64_string = base64_encoded.decode("utf-8")
+
     dialog_context = DialogContext(
         model="gpt-4o",
         max_tokens=1024,
         temperature=0.5,
     )
     context.user_data["dialog"] = dialog_context
-    dialog_context.messages.append(
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": """Представь, что ты столкнулся с мемом, который вызывает у тебя смех. Важно не описать
-                     картинку, а понять, почему этот мем смешной. Ответь коротко на следующие вопросы: Какие элементы
-                     мема вызывают смех? Какая основная идея или шутка заложена в меме? Есть ли какие-либо культурные
-                     или интернет-отсылки, которые следует знать, чтобы понять мем? Ответ не структурируй.""",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_string}",
-                    },
-                },
-            ],
-        },
-    )
+    dialog_context.messages.append(*MemeImagePrompt(image=image).messages)
     return send_to_open_ai(dialog_context)
 
 
@@ -643,7 +632,6 @@ async def algo_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -682,7 +670,6 @@ async def ml_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -721,7 +708,6 @@ async def interview_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -760,7 +746,6 @@ async def quest_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -799,7 +784,6 @@ async def test_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -838,7 +822,6 @@ async def roadmap_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -877,7 +860,6 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     if update.message.voice:
-
         audio_file = await context.bot.get_file(update.message.voice.file_id)
 
         audio_bytes = BytesIO(await audio_file.download_as_bytearray())
@@ -903,45 +885,16 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
     return PSYCHO_HELP
 
 
-async def dialog(update: Update, context: CallbackContext) -> int:
-    """Хэндлер диалога."""
-    if update.message is None:
-        raise BadArgumentError(MESSAGE_ARG)
-    if context.user_data is None:
-        raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].messages.append(
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": update.message.text,
-                },
-            ],
-        },
-    )
-    response = send_to_open_ai(context.user_data["dialog"])
-    await update.message.reply_text(text=response)
-    return DIALOG
-
-
 async def meme_explanation_dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога объяснения мема."""
-    if update.message is None:
+    if update.message is None or update.message.text:
+        raise BadArgumentError(MESSAGE_ARG)
+    if update.message.text:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].messages.append(
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": update.message.text,
-                },
-            ],
-        },
-    )
+    messages = GenericUserTextPrompt(text=update.message.text).messages  # type: ignore[arg-type]
+    context.user_data["dialog"].messages.append(*messages)
     response = send_to_open_ai(context.user_data["dialog"])
 
     if context.user_data is None:
@@ -1011,13 +964,13 @@ conv_handler = ConversationHandler(
             MessageHandler(filters.ATTACHMENT, meme_explanation),
             CommandHandler("start", start),
         ],
-        MEME_EXPL_DIALOG: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, meme_explanation_dialog),
+        MEME_NEED_REACT: [
+            CallbackQueryHandler(meme_need_reaction),
             CommandHandler("start", start),
             CommandHandler("finish_dialog", finish_dialog),
         ],
-        DIALOG: [
-            MessageHandler(~filters.COMMAND, dialog),
+        MEME_EXPL_DIALOG: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, meme_explanation_dialog),
             CommandHandler("start", start),
             CommandHandler("finish_dialog", finish_dialog),
         ],
