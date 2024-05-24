@@ -21,13 +21,13 @@ from telegram.ext import (
     filters,
 )
 
-from config.openai_client import client, generate_response, generate_transcription
+from config.openai_client import client, generate_transcription
 from config.telegram_bot import application
 from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, ModelName
 from utils.helpers import check_user_settings, single_text2text_query
-from utils.prompts import CodeExplanationPrompt
+from utils.prompts import AlgoTaskMakerPrompt, CodeExplanationPrompt
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -55,14 +55,14 @@ if TYPE_CHECKING:
     HARD,
     ALGO_TASK,
     ML_TASK,
-    USER_REPLY,
     DIALOG,
-) = range(23)
+) = range(22)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
 EFFECTIVE_CHAT_ARG = "update.effective_chat"
 USER_DATA_ARG = "context.user_data"
+I = 0
 
 
 async def start(update: Update, context: CallbackContext) -> int:
@@ -134,29 +134,33 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
         raise BadArgumentError(CALLBACK_QUERY_ARG)
     await query.answer()
     choice = query.data
-    if choice == "INTERVIEW_PREP" and check_user_settings(
-        context,
-    ):
-        if update.callback_query is None:
-            raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(
-            text="Please send a voice message or text reply.",
-        )
-        return USER_REPLY
+    # if choice == "INTERVIEW_PREP" and check_user_settings(
+    #     context,
+    # ):
+    #     if update.callback_query is None:
+    #         raise BadArgumentError(CALLBACK_QUERY_ARG)
+    #     await update.callback_query.edit_message_text(
+    #         text="Please send a voice message or text reply.",
+    #     )
+    #     return DIALOG
     if choice == "ALGO_TASK" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(
-            text="Please send a voice message or text reply.",
+        context.user_data["dialog"] = []
+        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"Уровень подготовки: {context.user_data['interview_hard']}\nУровень заданий: {context.user_data['questions_hard']}\nНа какую тему задачу?",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
-        return USER_REPLY
-    if choice == "ML_TASK" and check_user_settings(context):
-        if update.callback_query is None:
-            raise BadArgumentError(CALLBACK_QUERY_ARG)
-        await update.callback_query.edit_message_text(
-            text="Please send a voice message or text reply.",
-        )
-        return USER_REPLY
+        return DIALOG
+    # if choice == "ML_TASK" and check_user_settings(context):
+    #     if update.callback_query is None:
+    #         raise BadArgumentError(CALLBACK_QUERY_ARG)
+    #     await update.callback_query.edit_message_text(
+    #         text="Please send a voice message or text reply.",
+    #     )
+    #     return DIALOG
     if choice == "USER_SETTINGS":
         keyboard = [
             [InlineKeyboardButton("Уровень подготовки", callback_data="INTERVIEW_HARD")],
@@ -374,15 +378,50 @@ def explain_meme(data: bytearray) -> str:
     return content.strip()
 
 
+I = 0
+TOPIC: str = ""
+
+
 async def dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога."""
+    global I
+    global TOPIC
+    contex: str = ""
     if update.message is None:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
-    context.user_data["dialog"].append(update.message.text)
-    context.user_data["dialog"].append("Какой-то ответ")
-    await update.message.reply_text(text="Какой-то ответ")
+    if update.message.voice:
+
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        text: str = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        text = update.message.text
+    if I == 0:
+        TOPIC = text
+        I += 1
+    else:
+        contex += text
+
+    code: str = contex
+    prompt: AlgoTaskMakerPrompt = AlgoTaskMakerPrompt(
+        questions_hard=context.user_data["questions_hard"],
+        interview_hard=context.user_data["interview_hard"],
+        topic=TOPIC,
+        code=code,
+    )
+    explanation: str = single_text2text_query(
+        model=ModelName.GPT_4O,
+        prompt=prompt,
+        max_tokens=MAX_TOKENS,
+        temperature=TEMPERATURE,
+    )
+
+    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
     return DIALOG
 
 
@@ -393,7 +432,7 @@ async def finish_dialog(update: Update, context: CallbackContext) -> int:
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     await update.message.reply_text(
-        text="Вот таким был диалог: \n" + "\n".join(context.user_data["dialog"]),
+        text="Рад был помочь",
         reply_markup=ReplyKeyboardRemove(),
     )
     """Хэндлер завершения диалога"""
@@ -424,30 +463,6 @@ async def cancel(update: Update, _: CallbackContext) -> int:
     return ConversationHandler.END
 
 
-async def handle_user_reply(update: Update, context: CallbackContext) -> None:
-    """обработка  ответа от пользователя."""
-    if update.message is None:
-        raise BadArgumentError(MESSAGE_ARG)
-    if update.message.voice:
-
-        audio_file = await context.bot.get_file(update.message.voice.file_id)
-
-        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
-
-        transcription = generate_transcription(audio_bytes)
-
-        reply = generate_response(transcription)
-        await update.message.reply_text(reply)
-
-        logger.info("user:", audio_file.file_path)
-        logger.info("transcription:", transcription)
-        logger.info("assistant:", reply)
-
-    if update.message.text:
-        reply = generate_response(update.message.text)
-        await update.message.reply_text(reply)
-
-
 """Run the bot."""
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
@@ -459,7 +474,6 @@ conv_handler = ConversationHandler(
         INTERVIEW_HARD: [CallbackQueryHandler(interview_hard)],
         QUESTIONS_HARD: [CallbackQueryHandler(questions_hard)],
         CODE_EXPL: [CallbackQueryHandler(code_explanation), MessageHandler(filters.TEXT, code_explanation)],
-        USER_REPLY: [MessageHandler(filters.VOICE | filters.TEXT, handle_user_reply)],
         MEME_EXPL: [CallbackQueryHandler(meme_explanation), MessageHandler(filters.PHOTO, meme_explanation)],
         DIALOG: [
             MessageHandler(~filters.COMMAND, dialog),
