@@ -31,7 +31,7 @@ from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, CodePromptMode, ModelName, TaskPromptMode
 from utils.dialog_context import DialogContext
 from utils.helpers import check_user_settings, single_text2text_query
-from utils.prompts import CodePrompt, Prompt, TaskPrompt, AlgoTaskMakerPrompt, CodeExplanationPrompt
+from utils.prompts import AlgoTaskMakerPrompt, CodePrompt, Prompt, TaskPrompt
 
 if TYPE_CHECKING:
     from openai.types.beta.assistant import Assistant

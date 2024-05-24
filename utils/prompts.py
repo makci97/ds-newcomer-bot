@@ -93,29 +93,6 @@ class CodePrompt(Prompt):
 
 
 @dataclass
-class AlgoTaskMakerPrompt(Prompt):
-    """Prompt builder for algo task scenario."""
-
-    questions_hard: str
-    interview_hard: str
-    topic: str
-    reply: dict
-
-    @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
-        """Message history with a prompt for algo scenario."""
-        prompt: str = f"""
-                Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
-                с кандидатом на позицию {self.interview_hard} DS-разработчика.
-                Сформулируй задачу на алгоритмы (описание условий, пример данных на вход и выход)
-                и задай по ней вопросы(память и время выполнение) на тему {self.topic} уровня {self.questions_hard}
-                без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
-                Когда пользователь пришлет решение разбери его и если решение не правильное приведи правильное
-        """
-        return [
-            {"role": "system", "content": prompt},
-            *self.reply,]
-@dataclass
 class TaskPrompt(Prompt):
     """Prompt builder for code explanation scenario."""
 
@@ -168,3 +145,26 @@ class TaskPrompt(Prompt):
             {"role": "system", "content": prompt},
             {"role": "user", "content": self.task},
         ]
+@dataclass
+class AlgoTaskMakerPrompt(Prompt):
+    """Prompt builder for algo task scenario."""
+
+    questions_hard: str
+    interview_hard: str
+    topic: str
+    reply: dict
+
+    @property
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+        """Message history with a prompt for algo scenario."""
+        prompt: str = f"""
+                Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
+                с кандидатом на позицию {self.interview_hard} DS-разработчика.
+                Сформулируй задачу на алгоритмы (описание условий, пример данных на вход и выход)
+                и задай по ней вопросы(память и время выполнение) на тему {self.topic} уровня {self.questions_hard}
+                без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
+                Когда пользователь пришлет решение разбери его и если решение не правильное приведи правильное
+        """
+        return [
+            {"role": "system", "content": prompt},
+            *self.reply]
