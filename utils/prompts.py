@@ -29,7 +29,7 @@ class CodePrompt(Prompt):
     mode: CodePromptMode
 
     @property
-    def _instruction(self: typing.Self) -> str:
+    def _instruction(self) -> str:
         if self.mode == CodePromptMode.EXPLAIN:
             return """You should analyse, explain and interpret it.
 
@@ -81,7 +81,7 @@ class CodePrompt(Prompt):
         raise NotImplementedError(msg)
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt to retrieve code explanation."""
         prompt: str = (
             f"You are a virtual assistant for a data scientist. They will send you some code. {self._instruction}"
@@ -101,7 +101,7 @@ class TaskPrompt(Prompt):
     mode: TaskPromptMode
 
     @property
-    def _instruction(self: typing.Self) -> str:
+    def _instruction(self) -> str:
         if self.mode == TaskPromptMode.INSTRUCT:
             return """Based on the task description, generate a set of clear, concise, and actionable instructions
             that will guide someone through the completion of the task. The instructions should be easy to follow
@@ -135,7 +135,7 @@ class TaskPrompt(Prompt):
         raise NotImplementedError(msg)
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt to retrieve code explanation."""
         prompt: str = f"""You are a virtual assistant for a data scientist.
         In their message, they will send you a description of their task.
@@ -158,7 +158,7 @@ class AlgoTaskMakerPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for algo scenario."""
         prompt: str = f"""
                 Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
@@ -181,7 +181,7 @@ class MLTaskMakerPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for ml scenario."""
         prompt: str = f"""
                 Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
@@ -204,7 +204,7 @@ class InterviewMakerPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for interview scenario."""
         prompt: str = f"""
                 Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
@@ -229,7 +229,7 @@ class QestionsAskerPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for interview scenario."""
         prompt: str = f"""
                         Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей провести собеседование
@@ -253,7 +253,7 @@ class TestMakerPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for interview scenario."""
         prompt: str = f"""
                 Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей помочь {self.interview_hard}
@@ -277,7 +277,7 @@ class RoadMapMakerPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for interview scenario."""
         prompt: str = f"""
                     Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей помочь
@@ -295,7 +295,7 @@ class PsychoHelpPrompt(Prompt):
     reply: dict
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Message history with a prompt for interview scenario."""
         prompt: str = """
                 Представь, что ты опытный психолог, и к тебе пришел DS-разработчик.
@@ -312,7 +312,7 @@ class MemeImagePrompt(Prompt):
     image: bytearray
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Meme scenario prompt."""
         prompt: str = """Представь, что ты столкнулся с мемом, который вызывает у тебя смех. Важно не описать
          картинку, а понять, почему этот мем смешной. Ответь коротко на следующие вопросы: Какие элементы мема
@@ -345,7 +345,7 @@ class MemeNeedReactionPrompt(Prompt):
     """Prompt builder for meme reaction scenario."""
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Meme reaction prompt."""
         prompt: str = """Представьте, что вам прислали в чат мем. Вам нужно отреагировать на него в чате так, чтобы
          показать, что вы его поняли."""
@@ -369,7 +369,7 @@ class GenericUserTextPrompt(Prompt):
     text: str
 
     @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
         """User text prompt."""
         return [
             {

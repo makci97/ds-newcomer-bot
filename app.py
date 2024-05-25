@@ -30,7 +30,7 @@ from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, CodePromptMode, ModelName, TaskPromptMode
 from utils.dialog_context import DialogContext
-from utils.helpers import check_user_settings, gen_messages_from_eda_stream, single_text2text_query
+from utils.helpers import check_user_settings, gen_messages_from_eda_stream, single_text2text_query, text_splitter
 from utils.prompts import (
     AlgoTaskMakerPrompt,
     CodePrompt,
@@ -388,8 +388,8 @@ async def help_factory(update: Update, context: CallbackContext) -> int:
         max_tokens=MAX_TOKENS,
         temperature=TEMPERATURE,
     )
-
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return await start(update, context)
 
 
