@@ -988,13 +988,16 @@ async def remove_chat_buttons(
 
 async def deactivate_last_menu_button(context: CallbackContext) -> None:
     """Прячет кнопки из последнего сообщения-меню из context.user_data[LAST_MENU_MESSAGE]."""
-    if (
-        context.user_data is None
-        or LAST_MENU_MESSAGE not in context.user_data
-        or context.user_data[LAST_MENU_MESSAGE] is None
-    ):
-        return
-    await context.user_data[LAST_MENU_MESSAGE].edit_reply_markup(reply_markup=None)
+    try:
+        if (
+            context.user_data is None
+            or LAST_MENU_MESSAGE not in context.user_data
+            or context.user_data[LAST_MENU_MESSAGE] is None
+        ):
+            return
+        await context.user_data[LAST_MENU_MESSAGE].edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001
+        logger.debug("Не получилось деактивировать кнопки меню")
 
 
 async def cancel(update: Update, _: CallbackContext) -> int:
