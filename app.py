@@ -911,9 +911,7 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
 
 async def meme_explanation_dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога объяснения мема."""
-    if update.message is None or update.message.text:
-        raise BadArgumentError(MESSAGE_ARG)
-    if update.message.text:
+    if update.message is None or update.message.text is None:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
