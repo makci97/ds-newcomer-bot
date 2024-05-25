@@ -208,37 +208,11 @@ class InterviewMakerPrompt(Prompt):
         """Message history with a prompt for interview scenario."""
         prompt: str = f"""
                 Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
-                с кандидатом на позицию {self.interview_hard} DS-разработчика. Тема разговора: {self.topic}
+                с кандидатом на позицию {self.interview_hard} DS-разработчика. Вопросы должны быть по теме: {self.topic}
                 Сформулируй две задачи на алгоритмы(описание условий, пример данных на вход и выход)
-                уровня {self.questions_hard}
-                и серию вопросов по DS/ML  уровня {self.questions_hard} без подсказок и не показывай правильный
-                ответ пока пользователь не отправит свое решение
-                без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
+                уровня {self.questions_hard} и серию вопросов по уровня {self.questions_hard}
+                без подсказок и не показывай правильныйответ пока пользователь не отправит свое решение
                 Разбери решение пользователя когда он тебе ответит
-        """
-        return [{"role": "system", "content": prompt}, *self.reply]
-
-
-@dataclass
-class QestionsAskerPrompt(Prompt):
-    """Prompt builder for interview task scenario."""
-
-    questions_hard: str
-    interview_hard: str
-    topic: str
-    reply: dict
-
-    @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
-        """Message history with a prompt for interview scenario."""
-        prompt: str = f"""
-                        Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей провести собеседование
-                        с  {self.interview_hard} DS-разработчиком. Вам необходимо придумать ряд вопросов на тему
-                        {self.topic} различного уровня сложности: {self.questions_hard}.
-                        Важно, чтобы вопросы были разнообразными и не требовали подсказок.
-                        Правильные ответы не следует показывать до тех пор,
-                        пока пользователь не отправит свое решение.
-                        Разбери решение пользователя когда он тебе ответит
         """
         return [{"role": "system", "content": prompt}, *self.reply]
 
