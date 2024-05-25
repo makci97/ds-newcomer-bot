@@ -664,7 +664,8 @@ async def algo_dialog(update: Update, context: CallbackContext) -> int:
     )
 
     logger.debug(explanation)
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return ALGO_DIALOG
 
 
@@ -703,7 +704,8 @@ async def ml_dialog(update: Update, context: CallbackContext) -> int:
     )
 
     logger.debug(explanation)
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return ML_DIALOG
 
 
@@ -741,7 +743,8 @@ async def interview_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return INTERVIEW_DIALOG
 
 
@@ -779,7 +782,8 @@ async def test_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return TEST_MAKER
 
 
@@ -817,7 +821,8 @@ async def roadmap_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return ROADMAP_MAKER
 
 
@@ -849,7 +854,8 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return PSYCHO_HELP
 
 
