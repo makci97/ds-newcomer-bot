@@ -10,6 +10,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    Message,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     Update,
@@ -90,10 +91,12 @@ CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
 EFFECTIVE_CHAT_ARG = "update.effective_chat"
 USER_DATA_ARG = "context.user_data"
+LAST_MENU_MESSAGE = "last_menu_message"
 
 
 async def start(update: Update, context: CallbackContext) -> int:
     """Начальный хэндлер дерева команд."""
+    await deactivate_last_menu_button(context)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     await remove_chat_buttons(update, context)
@@ -104,10 +107,16 @@ async def start(update: Update, context: CallbackContext) -> int:
         [InlineKeyboardButton("Oбъясни IT мем", callback_data="MEME_EXPL")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    message = None
     if update.message:  # When /start command is used
-        await update.message.reply_text("Выберите задачу:", reply_markup=reply_markup)
+        message = await update.message.reply_text("Выберите задачу:", reply_markup=reply_markup)
     elif update.callback_query:
-        await update.callback_query.edit_message_text("Выберите задачу:", reply_markup=reply_markup)
+        message = await update.callback_query.edit_message_text(  # type: ignore[assignment]
+            "Выберите задачу:",
+            reply_markup=reply_markup,
+        )
+    if message and type(message) is Message:
+        context.user_data[LAST_MENU_MESSAGE] = message
     return TASK_CHOICE
 
 
@@ -906,6 +915,17 @@ async def remove_chat_buttons(
         raise BadArgumentError(EFFECTIVE_CHAT_ARG)
     msg = await context.bot.send_message(update.effective_chat.id, msg_text, reply_markup=ReplyKeyboardRemove())
     await msg.delete()
+
+
+async def deactivate_last_menu_button(context: CallbackContext) -> None:
+    """Прячет кнопки из последнего сообщения-меню из context.user_data[LAST_MENU_MESSAGE]."""
+    if (
+        context.user_data is None
+        or LAST_MENU_MESSAGE not in context.user_data
+        or context.user_data[LAST_MENU_MESSAGE] is None
+    ):
+        return
+    await context.user_data[LAST_MENU_MESSAGE].edit_reply_markup(reply_markup=None)
 
 
 async def cancel(update: Update, _: CallbackContext) -> int:
