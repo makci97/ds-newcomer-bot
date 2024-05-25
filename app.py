@@ -1034,7 +1034,7 @@ conv_handler = ConversationHandler(
             CommandHandler("finish_dialog", finish_dialog),
         ],
     },
-    fallbacks=[CommandHandler("cancel", cancel)],
+    fallbacks=[CommandHandler("start", start)],
 )
 
 application.add_handler(conv_handler)
