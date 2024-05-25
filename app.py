@@ -141,8 +141,8 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            text="Ты выбрал прокачку знаний. \
-                В этих сценариях ты можешь отвечать как в текстовом, так и в аудиоформате:",
+            text=f"Ты выбрал прокачку знаний.\n"
+            f"В этих сценариях ты можешь отвечать как в текстовом, так и в аудиоформате:",
             reply_markup=reply_markup,
         )
         return KNOWLEDGE_GAIN
