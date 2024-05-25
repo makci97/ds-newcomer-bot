@@ -480,6 +480,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
     )
     thread = client.beta.threads.create(messages=messages)
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
+        messages.append(MessageCreateParams(role="assistant", content=text))
         await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN, add_finish=True)
 
     await print_message(
@@ -526,6 +527,7 @@ async def dataset_chat(
     thread = client.beta.threads.create(messages=messages)
 
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
+        messages.append(MessageCreateParams(role="assistant", content=text))
         await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN, add_finish=True)
 
     await print_message(
@@ -1051,7 +1053,7 @@ conv_handler = ConversationHandler(
             CommandHandler("finish_dialog", finish_dialog),
         ],
         DATASET_CHAT: [
-            MessageHandler(~filters.COMMAND, interview_dialog),
+            MessageHandler(~filters.COMMAND, dataset_chat),
             CommandHandler("start", start),
             CommandHandler("finish_dialog", finish_dialog),
         ],

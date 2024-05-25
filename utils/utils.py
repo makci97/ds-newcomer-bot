@@ -48,7 +48,6 @@ async def print_message(
                 ReplyKeyboardMarkup([[KeyboardButton("/finish_dialog")]], resize_keyboard=True) if add_finish else None
             ),
         )
-        await message.reply_text(text, parse_mode=parse_mode)
     except NetworkError:
         logger.error(f"ТГ не смог напечатать текст: \n{text}")
         await message.reply_text("Извините, Телеграм не переварил ответ")
