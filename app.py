@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     TASK_HELP,
     HELP_FACTORY,
     EDA,
+    DATASET_CHAT,
     MEME_EXPL,
     MEME_NEED_REACT,
     MEME_EXPL_DIALOG,
@@ -86,7 +87,7 @@ if TYPE_CHECKING:
     TEST_MAKER,
     ROADMAP_MAKER,
     PSYCHO_HELP,
-) = range(30)
+) = range(31)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -317,6 +318,10 @@ async def problem_solving(update: Update, context: CallbackContext) -> int:
     if choice == "EDA":
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
+
+        context.user_data["messages"] = []  # type: ignore[index]
+        context.user_data["assistant_id"] = None  # type: ignore[index]
+
         keyboard = [[InlineKeyboardButton("Отмена", callback_data="CANCEL")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
@@ -400,6 +405,8 @@ async def eda(update: Update, context: CallbackContext) -> int:
         return await start(update, context)
     if update.message is None or update.message.document is None:
         raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
 
     logger.info("Download dataset from chat")
     stream_dataset: io.BytesIO = io.BytesIO()
@@ -419,10 +426,11 @@ async def eda(update: Update, context: CallbackContext) -> int:
         Output formatting:
         - Give anwser on russian except of column names or terms. It's important!
         - Give answer in correct Markdown format (use only Markdown's secial symbols)
-        - For all headers use Telegram's "*bold*", and `code` formatiing
-        instead of Markdown's "#", "##"
+        - For all headers use Telegram's "*text example*" for bold, and "`text example`" for code 
+        formatiing instead of Markdown's "#", "##"
         - Must be possible to pretty display answer in Telegram message
         - Don't use tables in response
+        - Answer that you can't plot any graph and image yet
         """,
         model="gpt-4o",
         tools=[{"type": "code_interpreter"}],
@@ -443,7 +451,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
     thread: Thread = client.beta.threads.create(messages=messages)
 
     logger.info("Process dataset")
-    await update.message.reply_text(text="Обрабатываем датасет (30-60 секунд)")
+    await print_message(message=update.message, text="Обрабатываем датасет (30-60 секунд)")
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
         messages.append(MessageCreateParams(role="assistant", content=text))
         await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN)
@@ -472,9 +480,64 @@ async def eda(update: Update, context: CallbackContext) -> int:
     )
     thread = client.beta.threads.create(messages=messages)
     for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
-        await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN)
+        await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN, add_finish=True)
 
-    return await start(update, context)
+    await print_message(
+        message=update.message,
+        text="У вас есть еще вопросы по датасету? Можно спросить текстом или голосовым.",
+        parse_mode=ParseMode.MARKDOWN,
+        add_finish=True,
+    )
+
+    context.user_data["messages"] = messages
+    context.user_data["assistant_id"] = eda_assistant.id
+    return DATASET_CHAT
+
+
+async def dataset_chat(
+    update: Update,
+    context: CallbackContext,
+) -> int:
+    """Хэндлер для вопросов по датасетам анализа датасета."""
+    logger.info("Chat about dataset")
+    if update.message is None:
+        raise BadArgumentError(MESSAGE_ARG)
+    if context.user_data is None:
+        raise BadArgumentError(USER_DATA_ARG)
+
+    logger.info("Get info from context")
+    eda_assistant: Assistant = client.beta.assistants.retrieve(assistant_id=context.user_data["assistant_id"])
+    messages: list[MessageCreateParams] = context.user_data["messages"]
+
+    logger.info("Get users question")
+    question: str
+    if update.message.voice:
+        audio_file = await context.bot.get_file(update.message.voice.file_id)
+
+        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
+
+        question = generate_transcription(audio_bytes)
+
+    if update.message.text:
+        question = update.message.text
+    logger.debug(f"{question=}")
+
+    messages.append(MessageCreateParams(role="user", content=question))
+    thread = client.beta.threads.create(messages=messages)
+
+    for text in gen_messages_from_eda_stream(thread=thread, eda_assistant=eda_assistant):
+        await print_message(message=update.message, text=text, parse_mode=ParseMode.MARKDOWN, add_finish=True)
+
+    await print_message(
+        message=update.message,
+        text="У вас есть еще вопросы по датасету? Можно спросить текстом или голосовым.",
+        parse_mode=ParseMode.MARKDOWN,
+        add_finish=True,
+    )
+
+    context.user_data["messages"] = messages
+    context.user_data["assistant_id"] = eda_assistant.id
+    return DATASET_CHAT
 
 
 async def user_settings(update: Update, context: CallbackContext) -> int:
@@ -981,7 +1044,17 @@ conv_handler = ConversationHandler(
         CODE_HELP: [CallbackQueryHandler(code_help)],
         TASK_HELP: [CallbackQueryHandler(task_help)],
         HELP_FACTORY: [CallbackQueryHandler(task_help), MessageHandler(filters.TEXT, help_factory)],
-        EDA: [CallbackQueryHandler(eda), MessageHandler(filters.ATTACHMENT, eda), CommandHandler("start", start)],
+        EDA: [
+            CallbackQueryHandler(eda),
+            MessageHandler(filters.ATTACHMENT, eda),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
+        DATASET_CHAT: [
+            MessageHandler(~filters.COMMAND, interview_dialog),
+            CommandHandler("start", start),
+            CommandHandler("finish_dialog", finish_dialog),
+        ],
         MEME_EXPL: [
             CallbackQueryHandler(meme_explanation),
             MessageHandler(filters.PHOTO, meme_explanation),
