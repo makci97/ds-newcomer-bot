@@ -16,7 +16,7 @@ class Prompt(ABC):
 
     @property
     @abstractmethod
-    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Final message history to be sent to LLM."""
         raise NotImplementedError
 
