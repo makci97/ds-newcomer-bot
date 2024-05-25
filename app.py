@@ -86,7 +86,7 @@ if TYPE_CHECKING:
     TEST_MAKER,
     ROADMAP_MAKER,
     PSYCHO_HELP,
-) = range(31)
+) = range(30)
 
 CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
@@ -421,7 +421,7 @@ async def eda(update: Update, context: CallbackContext) -> int:
         Output formatting:
         - Give anwser on russian except of column names or terms. It's important!
         - Give answer in correct Markdown format (use only Markdown's secial symbols)
-        - For all headers use Telegram's "*text example*" for bold, and "`text example`" for code 
+        - For all headers use Telegram's "*text example*" for bold, and "`text example`" for code
         formatiing instead of Markdown's "#", "##"
         - Must be possible to pretty display answer in Telegram message
         - Don't use tables in response
