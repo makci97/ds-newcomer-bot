@@ -1,7 +1,11 @@
 import typing
 
 from loguru import logger
-from telegram import Message
+from telegram import (
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+)
 from telegram.constants import ParseMode
 from telegram.error import NetworkError
 
@@ -29,10 +33,21 @@ def text_splitter(text: str, max_chunk_size: int = MAX_TELEGRM_MESSAGE_LEN) -> t
         i = j
 
 
-async def print_message(message: Message, text: str, parse_mode: ParseMode = ParseMode.MARKDOWN) -> None:
+async def print_message(
+    message: Message,
+    text: str,
+    parse_mode: ParseMode = ParseMode.MARKDOWN,
+    add_finish: bool = False,  # noqa: FBT001, FBT002
+) -> None:
     """Print message with errors handling."""
     try:
-        await message.reply_text(text, parse_mode=parse_mode)
+        await message.reply_text(
+            text,
+            parse_mode=parse_mode,
+            reply_markup=(
+                ReplyKeyboardMarkup([[KeyboardButton("/finish_dialog")]], resize_keyboard=True) if add_finish else None
+            ),
+        )
     except NetworkError:
         logger.error(f"ТГ не смог напечатать текст: \n{text}")
         await message.reply_text("Извините, Телеграм не переварил ответ")
