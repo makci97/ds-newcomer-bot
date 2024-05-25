@@ -16,7 +16,7 @@ class Prompt(ABC):
 
     @property
     @abstractmethod
-    def messages(self) -> typing.Iterable[ChatCompletionMessageParam]:
+    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
         """Final message history to be sent to LLM."""
         raise NotImplementedError
 
@@ -36,6 +36,8 @@ class CodePrompt(Prompt):
             Your response should consist of two parts:
             1. Textual description of what the code does in general.
             2. The very same code with inline comments where you explain everything step by step.
+
+            Your response should be in Russian except for the code.
             """
 
         if self.mode == CodePromptMode.FIND_BUG:
@@ -46,6 +48,8 @@ class CodePrompt(Prompt):
             2. If there are some issues, highlight what they are and how to fix them. In this case, you should:
                 - Provide textual description of all bugs and problems that you have found
                 - Provide the fixed version of the code with inline comments about what you have changed
+
+            Your response should be in Russian except for the code.
             """
 
         if self.mode == CodePromptMode.REFACTOR:
@@ -58,6 +62,8 @@ class CodePrompt(Prompt):
             In your response, be sure to provide the user with:
             1. Detailed description of the proposed changes.
             2. Refactored version of the code.
+
+            Your response should be in Russian except for the code.
             """
 
         if self.mode == CodePromptMode.REVIEW:
@@ -75,6 +81,8 @@ class CodePrompt(Prompt):
             - Presence of unit tests
 
             This list is not exhaustive. Provide a thorough analysis and any recommendations for improvements.
+
+            Your response should be in Russian except for the code.
             """
 
         msg: str = f"Unknown mode: {self.mode}"
@@ -114,6 +122,8 @@ class TaskPrompt(Prompt):
             4. Mention any specific tools, materials, libraries, or resources required.
             5. Highlight any important tips or warnings.
             6. Ensure the instructions are logically ordered and easy to understand.
+
+            Your response should be in Russian.
             """
 
         if self.mode == TaskPromptMode.IMPLEMENT:
@@ -129,6 +139,8 @@ class TaskPrompt(Prompt):
             5. Your code handles errors to manage potential exceptions or edge cases.
             6. Your code is optimized for performance where applicable.
             7. You have included a set of test cases or a simple testing framework to validate the functionality.
+
+            If you add any textual comments, give them in Russian.
             """
 
         msg: str = f"Unknown mode: {self.mode}"
@@ -208,37 +220,11 @@ class InterviewMakerPrompt(Prompt):
         """Message history with a prompt for interview scenario."""
         prompt: str = f"""
                 Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
-                с кандидатом на позицию {self.interview_hard} DS-разработчика. Тема разговора: {self.topic}
+                с кандидатом на позицию {self.interview_hard} DS-разработчика. Вопросы должны быть по теме: {self.topic}
                 Сформулируй две задачи на алгоритмы(описание условий, пример данных на вход и выход)
-                уровня {self.questions_hard}
-                и серию вопросов по DS/ML  уровня {self.questions_hard} без подсказок и не показывай правильный
-                ответ пока пользователь не отправит свое решение
-                без подсказок и не показывай правильный ответ пока пользователь не отправит свое решение.
+                уровня {self.questions_hard} и серию вопросов по уровня {self.questions_hard}
+                без подсказок и не показывай правильныйответ пока пользователь не отправит свое решение
                 Разбери решение пользователя когда он тебе ответит
-        """
-        return [{"role": "system", "content": prompt}, *self.reply]
-
-
-@dataclass
-class QestionsAskerPrompt(Prompt):
-    """Prompt builder for interview task scenario."""
-
-    questions_hard: str
-    interview_hard: str
-    topic: str
-    reply: dict
-
-    @property
-    def messages(self: typing.Self) -> typing.Iterable[ChatCompletionMessageParam]:
-        """Message history with a prompt for interview scenario."""
-        prompt: str = f"""
-                        Выступая в роли опытного IT-рекрутера, вы столкнулись с задачей провести собеседование
-                        с  {self.interview_hard} DS-разработчиком. Вам необходимо придумать ряд вопросов на тему
-                        {self.topic} различного уровня сложности: {self.questions_hard}.
-                        Важно, чтобы вопросы были разнообразными и не требовали подсказок.
-                        Правильные ответы не следует показывать до тех пор,
-                        пока пользователь не отправит свое решение.
-                        Разбери решение пользователя когда он тебе ответит
         """
         return [{"role": "system", "content": prompt}, *self.reply]
 

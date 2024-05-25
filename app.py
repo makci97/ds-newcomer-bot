@@ -10,6 +10,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    Message,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     Update,
@@ -30,7 +31,7 @@ from exceptions.bad_argument_error import BadArgumentError
 from exceptions.bad_choice_error import BadChoiceError
 from utils.constants import MAX_TOKENS, TEMPERATURE, CodePromptMode, ModelName, TaskPromptMode
 from utils.dialog_context import DialogContext
-from utils.helpers import check_user_settings, gen_messages_from_eda_stream, single_text2text_query
+from utils.helpers import check_user_settings, gen_messages_from_eda_stream, single_text2text_query, text_splitter
 from utils.prompts import (
     AlgoTaskMakerPrompt,
     CodePrompt,
@@ -41,7 +42,6 @@ from utils.prompts import (
     MLTaskMakerPrompt,
     Prompt,
     PsychoHelpPrompt,
-    QestionsAskerPrompt,
     RoadMapMakerPrompt,
     TaskPrompt,
     TestMakerPrompt,
@@ -83,7 +83,6 @@ if TYPE_CHECKING:
     ALGO_DIALOG,
     ML_DIALOG,
     INTERVIEW_DIALOG,
-    QUESTIONS_ASKER,
     TEST_MAKER,
     ROADMAP_MAKER,
     PSYCHO_HELP,
@@ -93,10 +92,12 @@ CALLBACK_QUERY_ARG = "update.callback_query"
 MESSAGE_ARG = "update.message"
 EFFECTIVE_CHAT_ARG = "update.effective_chat"
 USER_DATA_ARG = "context.user_data"
+LAST_MENU_MESSAGE = "last_menu_message"
 
 
 async def start(update: Update, context: CallbackContext) -> int:
     """Начальный хэндлер дерева команд."""
+    await deactivate_last_menu_button(context)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
     await remove_chat_buttons(update, context)
@@ -107,10 +108,16 @@ async def start(update: Update, context: CallbackContext) -> int:
         [InlineKeyboardButton("Oбъясни IT мем", callback_data="MEME_EXPL")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    message = None
     if update.message:  # When /start command is used
-        await update.message.reply_text("Выберите задачу:", reply_markup=reply_markup)
+        message = await update.message.reply_text("Выберите задачу:", reply_markup=reply_markup)
     elif update.callback_query:
-        await update.callback_query.edit_message_text("Выберите задачу:", reply_markup=reply_markup)
+        message = await update.callback_query.edit_message_text(  # type: ignore[assignment]
+            "Выберите задачу:",
+            reply_markup=reply_markup,
+        )
+    if message and type(message) is Message:
+        context.user_data[LAST_MENU_MESSAGE] = message
     return TASK_CHOICE
 
 
@@ -127,7 +134,6 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             [InlineKeyboardButton("Подготовка к собесу", callback_data="INTERVIEW_PREP")],
             [InlineKeyboardButton("Задача по алгоритмам", callback_data="ALGO_TASK")],
             [InlineKeyboardButton("Задача по Ml", callback_data="ML_TASK")],
-            [InlineKeyboardButton("Вопросы на подумать", callback_data="QUESTIONS_ASKER")],
             [InlineKeyboardButton("Создай тест", callback_data="TEST_MAKER")],
             [InlineKeyboardButton("ROADMAP", callback_data="ROADMAP_MAKER")],
             [InlineKeyboardButton("Психологическая помощь", callback_data="PSYCHO_HELP")],
@@ -135,7 +141,11 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text="Ты выбрал прокачку знаний:", reply_markup=reply_markup)
+        await query.edit_message_text(
+            text="Ты выбрал прокачку знаний.\n"
+            "В этих сценариях ты можешь отвечать как в текстовом, так и в аудиоформате:",
+            reply_markup=reply_markup,
+        )
         return KNOWLEDGE_GAIN
     if choice == "PROBLEM_SOL":
         keyboard = [
@@ -213,21 +223,6 @@ async def knowledge_gain(update: Update, context: CallbackContext) -> int:
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
         )
         return ML_DIALOG
-    if choice == "QUESTIONS_ASKER" and check_user_settings(context):
-        if update.callback_query is None:
-            raise BadArgumentError(CALLBACK_QUERY_ARG)
-        context.user_data["dialog"] = []  # type: ignore  # noqa: PGH003
-        context.user_data["topic"] = ""  # type: ignore  # noqa: PGH003
-        keyboard = [[KeyboardButton("/finish_dialog")]]  # type: ignore[list-item]
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,  # type: ignore  # noqa: PGH003
-            text=f"Уровень подготовки: "
-            f"{context.user_data['interview_hard']}\nУровень заданий: "  # type: ignore  # noqa: PGH003
-            f"{context.user_data['questions_hard']}\nНа какую тему хочешь вопросы?",
-            # type: ignore  # noqa: PGH003
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),  # type: ignore[arg-type]
-        )
-        return QUESTIONS_ASKER
     if choice == "TEST_MAKER" and check_user_settings(context):
         if update.callback_query is None:
             raise BadArgumentError(CALLBACK_QUERY_ARG)
@@ -393,8 +388,8 @@ async def help_factory(update: Update, context: CallbackContext) -> int:
         max_tokens=MAX_TOKENS,
         temperature=TEMPERATURE,
     )
-
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return await start(update, context)
 
 
@@ -747,7 +742,8 @@ async def algo_dialog(update: Update, context: CallbackContext) -> int:
     )
 
     logger.debug(explanation)
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return ALGO_DIALOG
 
 
@@ -786,7 +782,8 @@ async def ml_dialog(update: Update, context: CallbackContext) -> int:
     )
 
     logger.debug(explanation)
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return ML_DIALOG
 
 
@@ -824,46 +821,9 @@ async def interview_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return INTERVIEW_DIALOG
-
-
-async def quest_dialog(update: Update, context: CallbackContext) -> int:
-    """Хэндлер диалога."""
-    if update.message is None:
-        raise BadArgumentError(MESSAGE_ARG)
-    if context.user_data is None:
-        raise BadArgumentError(USER_DATA_ARG)
-    if update.message.voice:
-        audio_file = await context.bot.get_file(update.message.voice.file_id)
-
-        audio_bytes = BytesIO(await audio_file.download_as_bytearray())
-
-        text: str = generate_transcription(audio_bytes)
-
-    if update.message.text:
-        text = update.message.text
-
-    if context.user_data["topic"] == "":
-        context.user_data["topic"] = text
-    else:
-        context.user_data["dialog"].append({"role": "user", "content": text})
-
-    prompt: QestionsAskerPrompt = QestionsAskerPrompt(
-        questions_hard=context.user_data["questions_hard"],
-        interview_hard=context.user_data["interview_hard"],
-        topic=context.user_data["topic"],
-        reply=context.user_data["dialog"],
-    )
-    explanation: str = single_text2text_query(
-        model=ModelName.GPT_4O,
-        prompt=prompt,
-        max_tokens=MAX_TOKENS,
-        temperature=TEMPERATURE,
-    )
-
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
-    return QUESTIONS_ASKER
 
 
 async def test_dialog(update: Update, context: CallbackContext) -> int:
@@ -900,7 +860,8 @@ async def test_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return TEST_MAKER
 
 
@@ -938,7 +899,8 @@ async def roadmap_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return ROADMAP_MAKER
 
 
@@ -970,15 +932,14 @@ async def psyho_dialog(update: Update, context: CallbackContext) -> int:
         temperature=TEMPERATURE,
     )
 
-    await update.message.reply_text(text=explanation, parse_mode=ParseMode.MARKDOWN)
+    for text_chunk in text_splitter(text=explanation):
+        await update.message.reply_text(text=text_chunk, parse_mode=ParseMode.MARKDOWN)
     return PSYCHO_HELP
 
 
 async def meme_explanation_dialog(update: Update, context: CallbackContext) -> int:
     """Хэндлер диалога объяснения мема."""
-    if update.message is None or update.message.text:
-        raise BadArgumentError(MESSAGE_ARG)
-    if update.message.text:
+    if update.message is None or update.message.text is None:
         raise BadArgumentError(MESSAGE_ARG)
     if context.user_data is None:
         raise BadArgumentError(USER_DATA_ARG)
@@ -1023,6 +984,17 @@ async def remove_chat_buttons(
         raise BadArgumentError(EFFECTIVE_CHAT_ARG)
     msg = await context.bot.send_message(update.effective_chat.id, msg_text, reply_markup=ReplyKeyboardRemove())
     await msg.delete()
+
+
+async def deactivate_last_menu_button(context: CallbackContext) -> None:
+    """Прячет кнопки из последнего сообщения-меню из context.user_data[LAST_MENU_MESSAGE]."""
+    if (
+        context.user_data is None
+        or LAST_MENU_MESSAGE not in context.user_data
+        or context.user_data[LAST_MENU_MESSAGE] is None
+    ):
+        return
+    await context.user_data[LAST_MENU_MESSAGE].edit_reply_markup(reply_markup=None)
 
 
 async def cancel(update: Update, _: CallbackContext) -> int:
@@ -1085,11 +1057,6 @@ conv_handler = ConversationHandler(
         ],
         INTERVIEW_DIALOG: [
             MessageHandler(~filters.COMMAND, interview_dialog),
-            CommandHandler("start", start),
-            CommandHandler("finish_dialog", finish_dialog),
-        ],
-        QUESTIONS_ASKER: [
-            MessageHandler(~filters.COMMAND, quest_dialog),
             CommandHandler("start", start),
             CommandHandler("finish_dialog", finish_dialog),
         ],
