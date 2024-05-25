@@ -210,11 +210,12 @@ class InterviewMakerPrompt(Prompt):
                 Представь, что ты опытный IT-рекрутер, проводящий техническое собеседование
                 с кандидатом на позицию {self.interview_hard} DS-разработчика. Вопросы должны быть по теме: {self.topic}
                 Сформулируй две задачи на алгоритмы(описание условий, пример данных на вход и выход)
-                уровня {self.questions_hard} и серию вопросов по уровня {self.questions_hard} 
+                уровня {self.questions_hard} и серию вопросов по уровня {self.questions_hard}
                 без подсказок и не показывай правильныйответ пока пользователь не отправит свое решение
                 Разбери решение пользователя когда он тебе ответит
         """
         return [{"role": "system", "content": prompt}, *self.reply]
+
 
 @dataclass
 class TestMakerPrompt(Prompt):
