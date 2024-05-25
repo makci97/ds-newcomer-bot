@@ -134,7 +134,10 @@ async def task_choice(update: Update, _: CallbackContext) -> int:
             [InlineKeyboardButton("Назад", callback_data="BACK")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text="Ты выбрал прокачку знаний:", reply_markup=reply_markup)
+        await query.edit_message_text(
+            text="Ты выбрал прокачку знаний. Здесь ты можешь отвечать как в текстовом, так и в аудиоформате:",
+            reply_markup=reply_markup,
+        )
         return KNOWLEDGE_GAIN
     if choice == "PROBLEM_SOL":
         keyboard = [
